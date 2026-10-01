@@ -1,8 +1,18 @@
 import { Request, Response, CookieOptions } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../prisma';
-import { registerSchema, loginSchema } from '../validators/auth.validator';
-import { generateToken } from '../utils/token';
+import {
+  registerSchema,
+  loginSchema,
+  googleAuthSchema,
+  googleCompleteRegistrationSchema,
+} from '../validators/auth.validator';
+import {
+  generateToken,
+  generateOnboardingToken,
+  verifyOnboardingToken,
+} from '../utils/token';
+import { verifyGoogleIdToken } from '../utils/google';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const COOKIE_NAME = 'token';
@@ -14,6 +24,22 @@ const cookieOptions: CookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   path: '/',
 };
+
+/**
+ * Helper to format safe user object excluding sensitive fields like passwordHash.
+ */
+function toSafeUser(user: any) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    provider: user.provider,
+    status: user.status,
+    profileImage: user.profileImage,
+    createdAt: user.createdAt,
+  };
+}
 
 /**
  * POST /api/auth/register
@@ -84,7 +110,6 @@ export async function register(req: Request, res: Response): Promise<void> {
         status: true,
         profileImage: true,
         createdAt: true,
-        // passwordHash is intentionally never selected
       },
     });
 
@@ -175,21 +200,11 @@ export async function login(req: Request, res: Response): Promise<void> {
     // Set secure HTTP-only cookie
     res.cookie(COOKIE_NAME, token, cookieOptions);
 
-    // Return safe user object (excluding passwordHash)
     res.status(200).json({
       status: 'success',
       message: 'Login successful',
       data: {
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          provider: user.provider,
-          status: user.status,
-          profileImage: user.profileImage,
-          createdAt: user.createdAt,
-        },
+        user: toSafeUser(user),
         token,
       },
     });
@@ -198,6 +213,222 @@ export async function login(req: Request, res: Response): Promise<void> {
     res.status(500).json({
       status: 'error',
       message: 'Internal server error occurred during login',
+    });
+  }
+}
+
+/**
+ * POST /api/auth/google
+ * Google Sign-In verification endpoint.
+ *
+ * Flow:
+ * 1. Verifies Google token.
+ * 2. If user exists -> logs in immediately (returning Google users go directly into their account).
+ * 3. If user DOES NOT exist -> returns needs_role_selection with a short-lived onboardingToken
+ *    so the user can choose STUDENT or COMPANY (no ADMIN option).
+ */
+export async function googleAuth(req: Request, res: Response): Promise<void> {
+  const result = googleAuthSchema.safeParse(req.body);
+
+  if (!result.success) {
+    res.status(400).json({
+      status: 'error',
+      message: result.error.issues[0]?.message || 'Google token is required',
+    });
+    return;
+  }
+
+  const token = result.data.credential || result.data.idToken!;
+
+  try {
+    const profile = await verifyGoogleIdToken(token);
+
+    // Check if an account already exists with this googleId or email
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: profile.googleId }, { email: profile.email }],
+      },
+    });
+
+    // Case A: Returning Google user (or existing user linking Google)
+    if (user) {
+      if (user.status !== 'ACTIVE') {
+        res.status(403).json({
+          status: 'error',
+          message: `Account is ${user.status.toLowerCase()}. Please contact support.`,
+        });
+        return;
+      }
+
+      // Link googleId if they previously signed up with local email
+      if (!user.googleId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: profile.googleId,
+            profileImage: user.profileImage || profile.profileImage,
+          },
+        });
+      }
+
+      const sessionToken = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+
+      res.status(200).json({
+        status: 'success',
+        isNewUser: false,
+        message: 'Welcome back! Logged in with Google.',
+        data: {
+          user: toSafeUser(user),
+          token: sessionToken,
+        },
+      });
+      return;
+    }
+
+    // Case B: First-time Google user -> Must choose account type (STUDENT or COMPANY)
+    const onboardingToken = generateOnboardingToken({
+      googleId: profile.googleId,
+      email: profile.email,
+      name: profile.name,
+      profileImage: profile.profileImage,
+    });
+
+    res.status(200).json({
+      status: 'needs_role_selection',
+      isNewUser: true,
+      message: 'No account found. Please choose your account type (Student or Company) to complete registration.',
+      data: {
+        onboardingToken,
+        profile: {
+          name: profile.name,
+          email: profile.email,
+          profileImage: profile.profileImage,
+        },
+        allowedRoles: ['STUDENT', 'COMPANY'],
+      },
+    });
+  } catch (error: any) {
+    console.error('Google auth error:', error.message);
+    res.status(401).json({
+      status: 'error',
+      message: error.message || 'Google authentication failed',
+    });
+  }
+}
+
+/**
+ * POST /api/auth/google/complete-registration
+ * Finalizes first-time Google sign-up after the user selects their account type:
+ * STUDENT or COMPANY. ADMIN is forbidden.
+ */
+export async function googleCompleteRegistration(req: Request, res: Response): Promise<void> {
+  const result = googleCompleteRegistrationSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const errorMsg = result.error.issues[0]?.message || 'Invalid onboarding input';
+    res.status(400).json({
+      status: 'error',
+      message: errorMsg,
+    });
+    return;
+  }
+
+  const { onboardingToken, role } = result.data;
+
+  // Strict role check: ADMIN option is impossible
+  if ((role as string) === 'ADMIN') {
+    res.status(403).json({
+      status: 'error',
+      message: 'Security Violation: Direct registration as ADMIN is strictly prohibited.',
+    });
+    return;
+  }
+
+  try {
+    // Verify the short-lived onboarding token
+    const onboardingData = verifyOnboardingToken(onboardingToken);
+
+    // Double-check if user was created in the meantime
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: onboardingData.googleId }, { email: onboardingData.email }],
+      },
+    });
+
+    if (existing) {
+      // User already completed registration or exists
+      const sessionToken = generateToken({
+        userId: existing.id,
+        email: existing.email,
+        role: existing.role,
+      });
+
+      res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+
+      res.status(200).json({
+        status: 'success',
+        isNewUser: false,
+        message: 'Account already created. Logged in successfully.',
+        data: {
+          user: toSafeUser(existing),
+          token: sessionToken,
+        },
+      });
+      return;
+    }
+
+    // Create the brand new User with provider: GOOGLE and passwordHash: null
+    const newUser = await prisma.user.create({
+      data: {
+        name: onboardingData.name,
+        email: onboardingData.email,
+        googleId: onboardingData.googleId,
+        profileImage: onboardingData.profileImage,
+        provider: 'GOOGLE',
+        role,
+        status: 'ACTIVE',
+        passwordHash: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        provider: true,
+        status: true,
+        profileImage: true,
+        createdAt: true,
+      },
+    });
+
+    // Generate JWT session token
+    const sessionToken = generateToken({
+      userId: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+    });
+
+    res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Google account created successfully',
+      data: {
+        user: newUser,
+        token: sessionToken,
+      },
+    });
+  } catch (error: any) {
+    console.error('Google complete registration error:', error.message);
+    res.status(401).json({
+      status: 'error',
+      message: 'Onboarding session has expired or is invalid. Please sign in with Google again.',
     });
   }
 }
