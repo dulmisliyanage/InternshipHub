@@ -8,6 +8,18 @@ import type {
 
 const API_BASE = '/api/auth';
 
+export class ApiError extends Error {
+  status: number;
+  errors?: { field: string; message: string }[];
+
+  constructor(message: string, status: number, errors?: { field: string; message: string }[]) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.errors = errors;
+  }
+}
+
 /**
  * Reusable request helper that always includes HTTP-only session cookies.
  */
@@ -21,10 +33,14 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     },
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data.message || `Request failed with status ${res.status}`);
+    throw new ApiError(
+      data.message || `Request failed with status ${res.status}`,
+      res.status,
+      data.errors
+    );
   }
 
   return data as T;
