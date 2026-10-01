@@ -451,8 +451,10 @@ export async function googleCompleteRegistration(req: Request, res: Response): P
  */
 export async function logout(req: Request, res: Response): Promise<void> {
   res.clearCookie(COOKIE_NAME, {
-    ...cookieOptions,
-    maxAge: 0,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
   });
 
   res.status(200).json({

@@ -24,10 +24,16 @@ export const App: React.FC = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/choose-account-type" element={<ChooseAccountTypePage />} />
 
-          {/* Protected Dashboard Routes (Placeholder wrapper) */}
-          <Route element={<ProtectedRoute />}>
+          {/* Role-Protected Dashboard Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
             <Route path="/student/dashboard" element={<StudentDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['COMPANY']} />}>
             <Route path="/company/dashboard" element={<CompanyDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Route>
 

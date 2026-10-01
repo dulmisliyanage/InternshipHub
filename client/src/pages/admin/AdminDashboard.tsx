@@ -1,8 +1,27 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
 
 export const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const displayName = user?.name || 'Platform Administrator';
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout failed:', err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)' }}>
       {/* Top Bar */}
@@ -38,16 +57,20 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Link to="/login">
-            <Button size="sm" variant="ghost">
-              Sign out
-            </Button>
-          </Link>
+          <Button
+            id="admin-logout-btn"
+            size="sm"
+            variant="ghost"
+            onClick={handleLogout}
+            isLoading={isLoggingOut}
+          >
+            Sign out
+          </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '1000px', margin: '2.5rem auto', padding: '0 1.5rem' }}>
+      <main style={{ maxWidth: '800px', margin: '3rem auto', padding: '0 1.5rem' }}>
         <div
           style={{
             backgroundColor: 'var(--color-surface)',
@@ -55,52 +78,47 @@ export const AdminDashboard: React.FC = () => {
             borderRadius: 'var(--radius-xl)',
             padding: '2.5rem',
             boxShadow: 'var(--shadow-sm)',
+            textAlign: 'center',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <span style={{ fontSize: '2rem' }}>🛡️</span>
-            <div>
-              <h1 className="page-heading" style={{ fontSize: '1.5rem', margin: 0 }}>
-                Admin Control Center Placeholder
-              </h1>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                Protected Route: <code>/admin/dashboard</code>
-              </p>
-            </div>
-          </div>
-
-          <p style={{ color: 'var(--color-text-primary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-            Welcome to the Platform Administration Center. Administrators oversee system health, manage platform users, and review moderation flags.
-          </p>
-
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '1rem',
-              marginTop: '1.5rem',
+              width: '56px',
+              height: '56px',
+              borderRadius: 'var(--radius-xl)',
+              backgroundColor: '#FEE2E2',
+              color: '#991B1B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem',
+              fontSize: '1.75rem',
             }}
           >
-            <div style={{ padding: '1.25rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Total Platform Users</span>
-              <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.25rem' }}>Active</div>
-            </div>
-            <div style={{ padding: '1.25rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Pending Verifications</span>
-              <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.25rem' }}>0</div>
-            </div>
-            <div style={{ padding: '1.25rem', backgroundColor: 'var(--color-background)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>RBAC Security Status</span>
-              <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.25rem', color: 'var(--color-error)' }}>Enforced</div>
-            </div>
+            🛡️
           </div>
 
-          <div style={{ marginTop: '2rem', display: 'flex', gap: '0.75rem' }}>
+          <h1 className="page-heading" style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>
+            Admin Dashboard
+          </h1>
+
+          <p style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>
+            Welcome, {displayName}
+          </p>
+
+          <p style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: '0.95rem', marginBottom: '2rem' }}>
+            ✓ Your administrator account is authenticated successfully.
+          </p>
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
             <Link to="/">
               <Button variant="secondary" size="md">
                 ← Return to Home
               </Button>
             </Link>
+            <Button variant="outline" size="md" onClick={handleLogout}>
+              Logout
+            </Button>
           </div>
         </div>
       </main>

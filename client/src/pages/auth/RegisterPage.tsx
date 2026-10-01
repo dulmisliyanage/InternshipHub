@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import {
@@ -8,8 +8,9 @@ import {
   Button,
   FormError,
 } from '../../components/ui';
-import { authService, ApiError } from '../../services/auth.service';
 import { useAuth } from '../../context/AuthContext';
+import { getDashboardPath } from '../../utils/navigation';
+import { ApiError } from '../../services/auth.service';
 
 interface FormState {
   name: string;
@@ -30,7 +31,7 @@ interface FormErrors {
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { register, user, isAuthenticated, isLoading } = useAuth();
 
   const [form, setForm] = useState<FormState>({
     name: '',
@@ -42,6 +43,13 @@ export const RegisterPage: React.FC = () => {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // If already authenticated, redirect straight to user's dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      navigate(getDashboardPath(user.role), { replace: true });
+    }
+  }, [isAuthenticated, user, isLoading, navigate]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -90,7 +98,6 @@ export const RegisterPage: React.FC = () => {
 
   const handleChange = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-    // Clear field-specific error as user types
     if (errors[field as keyof FormErrors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
@@ -102,7 +109,6 @@ export const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent duplicate submission while already processing
     if (isSubmitting) return;
 
     if (!validateForm()) {
@@ -113,38 +119,19 @@ export const RegisterPage: React.FC = () => {
     setErrors({});
 
     try {
-      // 1. Submit registration request (password confirmation stripped out)
-      await authService.register({
+      // Register through AuthContext; sets cookie & retrieves authoritative /me
+      const authenticatedUser = await register({
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
         role: form.role as 'STUDENT' | 'COMPANY',
       });
 
-      // 2. Step 6: Verify session after registration via GET /api/auth/me
-      // Rather than trusting frontend state, read the verified user from the server
-      const meResponse = await authService.getCurrentUser();
-      const authenticatedUser = meResponse.data?.user;
-
-      if (!authenticatedUser) {
-        throw new Error('Could not verify authenticated session. Please try logging in.');
-      }
-
-      // Update AuthContext
-      setUser(authenticatedUser);
-
-      // Route dynamically according to the verified role from /me
-      if (authenticatedUser.role === 'STUDENT') {
-        navigate('/student/dashboard');
-      } else if (authenticatedUser.role === 'COMPANY') {
-        navigate('/company/dashboard');
-      } else {
-        navigate('/');
-      }
+      // Navigate using the centralized role router helper
+      navigate(getDashboardPath(authenticatedUser.role), { replace: true });
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
-          // Specific duplicate email handling
           setErrors({
             email: 'An account with this email already exists',
             general: 'An account with this email already exists. Please log in or use another email.',
@@ -171,7 +158,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   const handleGoogleClick = () => {
-    alert('Google authentication will be connected in Step 2.8. Please register using email and password.');
+    alert('Google authentication will be connected in Step 2.9. Please register using email and password.');
   };
 
   return (
@@ -195,7 +182,7 @@ export const RegisterPage: React.FC = () => {
           fullWidth
           size="lg"
           onClick={handleGoogleClick}
-          aria-label="Continue with Google (Enabled in Step 2.8)"
+          aria-label="Continue with Google"
         >
           Continue with Google
         </Button>

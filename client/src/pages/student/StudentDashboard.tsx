@@ -1,11 +1,26 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 
 export const StudentDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const displayName = user?.name || 'Sarah Student';
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout failed:', err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)' }}>
@@ -41,11 +56,15 @@ export const StudentDashboard: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Link to="/login">
-            <Button size="sm" variant="ghost">
-              Sign out
-            </Button>
-          </Link>
+          <Button
+            id="student-logout-btn"
+            size="sm"
+            variant="ghost"
+            onClick={handleLogout}
+            isLoading={isLoggingOut}
+          >
+            Sign out
+          </Button>
         </div>
       </header>
 
@@ -96,6 +115,9 @@ export const StudentDashboard: React.FC = () => {
                 ← Return to Home
               </Button>
             </Link>
+            <Button variant="outline" size="md" onClick={handleLogout}>
+              Logout
+            </Button>
           </div>
         </div>
       </main>
