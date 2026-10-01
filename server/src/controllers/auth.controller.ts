@@ -44,6 +44,7 @@ function toSafeUser(user: any) {
 /**
  * POST /api/auth/register
  * Public registration flow for STUDENT and COMPANY roles.
+ * Stores JWT in HTTP-only cookie; does NOT return JWT in JSON response.
  */
 export async function register(req: Request, res: Response): Promise<void> {
   const result = registerSchema.safeParse(req.body);
@@ -113,22 +114,21 @@ export async function register(req: Request, res: Response): Promise<void> {
       },
     });
 
-    // Generate JWT token
+    // Generate JWT token and set in secure HTTP-only cookie
     const token = generateToken({
       userId: newUser.id,
       email: newUser.email,
       role: newUser.role,
     });
 
-    // Set secure HTTP-only cookie
     res.cookie(COOKIE_NAME, token, cookieOptions);
 
+    // Return safe user object (token is kept exclusively in HTTP-only cookie)
     res.status(201).json({
       status: 'success',
       message: 'Account registered successfully',
       data: {
         user: newUser,
-        token,
       },
     });
   } catch (error: any) {
@@ -143,6 +143,7 @@ export async function register(req: Request, res: Response): Promise<void> {
 /**
  * POST /api/auth/login
  * Local email/password authentication flow.
+ * Sets HTTP-only cookie; does NOT return JWT in JSON response.
  */
 export async function login(req: Request, res: Response): Promise<void> {
   const result = loginSchema.safeParse(req.body);
@@ -190,22 +191,21 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Generate JWT token
+    // Generate JWT token and set in secure HTTP-only cookie
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
-    // Set secure HTTP-only cookie
     res.cookie(COOKIE_NAME, token, cookieOptions);
 
+    // Return safe user object without exposing JWT to JavaScript
     res.status(200).json({
       status: 'success',
       message: 'Login successful',
       data: {
         user: toSafeUser(user),
-        token,
       },
     });
   } catch (error: any) {
@@ -223,9 +223,11 @@ export async function login(req: Request, res: Response): Promise<void> {
  *
  * Flow:
  * 1. Verifies Google token.
- * 2. If user exists -> logs in immediately (returning Google users go directly into their account).
- * 3. If user DOES NOT exist -> returns needs_role_selection with a short-lived onboardingToken
- *    so the user can choose STUDENT or COMPANY (no ADMIN option).
+ * 2. Matches user strictly by googleId (no blind email linking).
+ * 3. If user exists -> logs in immediately via HTTP-only cookie (Returning Google user).
+ * 4. If user does NOT exist with googleId:
+ *    a. Checks if email is already in use by a LOCAL account -> Rejects with 409 to prevent blind merging.
+ *    b. Otherwise -> returns needs_role_selection with short-lived onboardingToken (Student vs Company).
  */
 export async function googleAuth(req: Request, res: Response): Promise<void> {
   const result = googleAuthSchema.safeParse(req.body);
@@ -243,14 +245,12 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
   try {
     const profile = await verifyGoogleIdToken(token);
 
-    // Check if an account already exists with this googleId or email
-    let user = await prisma.user.findFirst({
-      where: {
-        OR: [{ googleId: profile.googleId }, { email: profile.email }],
-      },
+    // 1. Strict identity lookup by googleId only (no blind email merging)
+    const user = await prisma.user.findUnique({
+      where: { googleId: profile.googleId },
     });
 
-    // Case A: Returning Google user (or existing user linking Google)
+    // Case A: Returning Google user
     if (user) {
       if (user.status !== 'ACTIVE') {
         res.status(403).json({
@@ -258,17 +258,6 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
           message: `Account is ${user.status.toLowerCase()}. Please contact support.`,
         });
         return;
-      }
-
-      // Link googleId if they previously signed up with local email
-      if (!user.googleId) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            googleId: profile.googleId,
-            profileImage: user.profileImage || profile.profileImage,
-          },
-        });
       }
 
       const sessionToken = generateToken({
@@ -285,13 +274,29 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
         message: 'Welcome back! Logged in with Google.',
         data: {
           user: toSafeUser(user),
-          token: sessionToken,
         },
       });
       return;
     }
 
-    // Case B: First-time Google user -> Must choose account type (STUDENT or COMPANY)
+    // Case B: Not an existing Google user.
+    // Check if an existing LOCAL account already uses this email.
+    // We intentionally reject blind merging rather than automatically linking.
+    const emailConflict = await prisma.user.findUnique({
+      where: { email: profile.email },
+    });
+
+    if (emailConflict) {
+      res.status(409).json({
+        status: 'error',
+        code: 'EMAIL_ALREADY_IN_USE',
+        message:
+          'An account with this email already exists using email/password. Please log in using your password.',
+      });
+      return;
+    }
+
+    // Case C: First-time Google user -> Must choose account type (STUDENT or COMPANY)
     const onboardingToken = generateOnboardingToken({
       googleId: profile.googleId,
       email: profile.email,
@@ -326,6 +331,7 @@ export async function googleAuth(req: Request, res: Response): Promise<void> {
  * POST /api/auth/google/complete-registration
  * Finalizes first-time Google sign-up after the user selects their account type:
  * STUDENT or COMPANY. ADMIN is forbidden.
+ * Sets HTTP-only cookie; does NOT return JWT in JSON response.
  */
 export async function googleCompleteRegistration(req: Request, res: Response): Promise<void> {
   const result = googleCompleteRegistrationSchema.safeParse(req.body);
@@ -354,31 +360,38 @@ export async function googleCompleteRegistration(req: Request, res: Response): P
     // Verify the short-lived onboarding token
     const onboardingData = verifyOnboardingToken(onboardingToken);
 
-    // Double-check if user was created in the meantime
-    const existing = await prisma.user.findFirst({
+    // Verify neither googleId nor email already exists
+    const conflict = await prisma.user.findFirst({
       where: {
         OR: [{ googleId: onboardingData.googleId }, { email: onboardingData.email }],
       },
     });
 
-    if (existing) {
-      // User already completed registration or exists
-      const sessionToken = generateToken({
-        userId: existing.id,
-        email: existing.email,
-        role: existing.role,
-      });
+    if (conflict) {
+      if (conflict.googleId === onboardingData.googleId) {
+        // Idempotent: already completed
+        const sessionToken = generateToken({
+          userId: conflict.id,
+          email: conflict.email,
+          role: conflict.role,
+        });
 
-      res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
+        res.cookie(COOKIE_NAME, sessionToken, cookieOptions);
 
-      res.status(200).json({
-        status: 'success',
-        isNewUser: false,
-        message: 'Account already created. Logged in successfully.',
-        data: {
-          user: toSafeUser(existing),
-          token: sessionToken,
-        },
+        res.status(200).json({
+          status: 'success',
+          isNewUser: false,
+          message: 'Account already created. Logged in successfully.',
+          data: {
+            user: toSafeUser(conflict),
+          },
+        });
+        return;
+      }
+
+      res.status(409).json({
+        status: 'error',
+        message: 'An account with this email address already exists.',
       });
       return;
     }
@@ -407,7 +420,7 @@ export async function googleCompleteRegistration(req: Request, res: Response): P
       },
     });
 
-    // Generate JWT session token
+    // Generate JWT session token and set in secure HTTP-only cookie
     const sessionToken = generateToken({
       userId: newUser.id,
       email: newUser.email,
@@ -421,7 +434,6 @@ export async function googleCompleteRegistration(req: Request, res: Response): P
       message: 'Google account created successfully',
       data: {
         user: newUser,
-        token: sessionToken,
       },
     });
   } catch (error: any) {
