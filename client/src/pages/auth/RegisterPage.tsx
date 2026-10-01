@@ -8,6 +8,7 @@ import {
   Button,
   FormError,
 } from '../../components/ui';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardPath } from '../../utils/navigation';
 import { ApiError } from '../../services/auth.service';
@@ -43,6 +44,7 @@ export const RegisterPage: React.FC = () => {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailConflict, setEmailConflict] = useState(false);
 
   // If already authenticated, redirect straight to user's dashboard
   useEffect(() => {
@@ -117,9 +119,9 @@ export const RegisterPage: React.FC = () => {
 
     setIsSubmitting(true);
     setErrors({});
+    setEmailConflict(false);
 
     try {
-      // Register through AuthContext; sets cookie & retrieves authoritative /me
       const authenticatedUser = await register({
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
@@ -127,15 +129,15 @@ export const RegisterPage: React.FC = () => {
         role: form.role as 'STUDENT' | 'COMPANY',
       });
 
-      // Navigate using the centralized role router helper
       navigate(getDashboardPath(authenticatedUser.role), { replace: true });
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
           setErrors({
             email: 'An account with this email already exists',
-            general: 'An account with this email already exists. Please log in or use another email.',
+            general: 'An account with this email already exists. Please log in using your password.',
           });
+          setEmailConflict(true);
         } else if (err.errors && err.errors.length > 0) {
           const fieldErrors: FormErrors = {};
           err.errors.forEach((e) => {
@@ -157,10 +159,6 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
-  const handleGoogleClick = () => {
-    alert('Google authentication will be connected in Step 2.9. Please register using email and password.');
-  };
-
   return (
     <AuthLayout
       title="Create your account"
@@ -174,18 +172,15 @@ export const RegisterPage: React.FC = () => {
         </p>
       }
     >
-      {/* Google Sign-in Button (Inactive placeholder for this step) */}
+      {/* Google Sign-in Button */}
       <div style={{ marginBottom: '1.25rem' }}>
-        <Button
-          type="button"
-          variant="google"
-          fullWidth
-          size="lg"
-          onClick={handleGoogleClick}
-          aria-label="Continue with Google"
-        >
-          Continue with Google
-        </Button>
+        <GoogleAuthButton
+          text="Continue with Google"
+          onError={(msg, isConflict) => {
+            setErrors({ general: msg });
+            setEmailConflict(!!isConflict);
+          }}
+        />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0 1.5rem' }}>
@@ -196,7 +191,20 @@ export const RegisterPage: React.FC = () => {
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
       </div>
 
-      {errors.general && <FormError message={errors.general} />}
+      {errors.general && (
+        <div style={{ marginBottom: '1rem' }}>
+          <FormError message={errors.general} />
+          {emailConflict && (
+            <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+              <Link to="/login">
+                <Button variant="outline" size="sm">
+                  Sign in with password
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate>
         {/* Full Name */}

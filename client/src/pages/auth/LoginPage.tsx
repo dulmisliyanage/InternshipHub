@@ -8,6 +8,7 @@ import {
   Button,
   FormError,
 } from '../../components/ui';
+import { GoogleAuthButton } from '../../components/auth/GoogleAuthButton';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardPath } from '../../utils/navigation';
 import { ApiError } from '../../services/auth.service';
@@ -21,8 +22,9 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailConflict, setEmailConflict] = useState(false);
 
-  // If already logged in, redirect straight to the user's dashboard
+  // If already logged in, redirect straight to user's dashboard
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
       const destination = location.state?.from?.pathname || getDashboardPath(user.role);
@@ -59,6 +61,7 @@ export const LoginPage: React.FC = () => {
 
     setIsSubmitting(true);
     setErrors({});
+    setEmailConflict(false);
 
     try {
       const authenticatedUser = await login({
@@ -66,7 +69,6 @@ export const LoginPage: React.FC = () => {
         password,
       });
 
-      // Redirect to attempted destination or designated role dashboard
       const targetPath = location.state?.from?.pathname || getDashboardPath(authenticatedUser.role);
       navigate(targetPath, { replace: true });
     } catch (err: unknown) {
@@ -79,10 +81,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleGoogleClick = () => {
-    alert('Google authentication will be connected in Step 2.9. Please sign in with your email and password.');
   };
 
   return (
@@ -98,18 +96,15 @@ export const LoginPage: React.FC = () => {
         </p>
       }
     >
-      {/* Google Sign-in Button (Inactive placeholder for this step) */}
+      {/* Google Sign-in Button */}
       <div style={{ marginBottom: '1.25rem' }}>
-        <Button
-          type="button"
-          variant="google"
-          fullWidth
-          size="lg"
-          onClick={handleGoogleClick}
-          aria-label="Continue with Google"
-        >
-          Continue with Google
-        </Button>
+        <GoogleAuthButton
+          text="Continue with Google"
+          onError={(msg, isConflict) => {
+            setErrors({ general: msg });
+            setEmailConflict(!!isConflict);
+          }}
+        />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0 1.5rem' }}>
@@ -120,7 +115,18 @@ export const LoginPage: React.FC = () => {
         <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
       </div>
 
-      {errors.general && <FormError message={errors.general} />}
+      {errors.general && (
+        <div style={{ marginBottom: '1rem' }}>
+          <FormError message={errors.general} />
+          {emailConflict && (
+            <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                Please enter your password below to sign in.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate>
         {/* Email Address */}
