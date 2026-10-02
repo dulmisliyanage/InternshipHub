@@ -10,6 +10,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ChooseAccountTypePage } from './pages/auth/ChooseAccountTypePage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
+import { StudentOnboardingPage } from './pages/student/StudentOnboardingPage';
 import { CompanyDashboard } from './pages/company/CompanyDashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
           {/* Role-Protected Dashboard Routes */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
             <Route path="/student/dashboard" element={<StudentDashboard />} />
+            <Route path="/student/onboarding" element={<StudentOnboardingPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['COMPANY']} />}>
