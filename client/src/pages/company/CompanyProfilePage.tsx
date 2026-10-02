@@ -9,6 +9,7 @@ import {
   CompanyInfoSection,
   CompanyLinksSection,
 } from '../../components/company/profile';
+import { ProfileCompletionCard } from '../../components/profile';
 import { companyService } from '../../services/company.service';
 import type { CompanyProfile } from '../../types/company';
 
@@ -134,6 +135,16 @@ export const CompanyProfilePage: React.FC = () => {
         }}
       >
         <CompanyProfileHeader profile={profile} />
+        {profile.completion && (
+          <ProfileCompletionCard
+            completion={profile.completion}
+            title="Strengthen your company profile"
+            description="Help students understand your organization, culture, and opportunities before they apply."
+            editPath="/company/profile/edit"
+            ctaLabel="Complete Profile"
+            variant="full"
+          />
+        )}
         <CompanyAboutSection description={profile.description} />
         <CompanyInfoSection
           industry={profile.industry}

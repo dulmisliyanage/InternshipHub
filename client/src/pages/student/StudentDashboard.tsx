@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StudentNavbar } from '../../components/student/StudentNavbar';
 import { ProfileAvatar } from '../../components/student/profile/ProfileAvatar';
+import { ProfileCompletionCard } from '../../components/profile';
 import { useAuth } from '../../context/AuthContext';
 import { studentService } from '../../services/student.service';
 import type { StudentProfile } from '../../types/student';
@@ -104,21 +105,23 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: 'var(--color-success)',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                padding: '0.35rem 0.75rem',
-                borderRadius: 'var(--radius-full)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-              }}
-            >
-              ✓ Profile Complete
-            </span>
+            {profile?.completion && (
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  color: profile.completion.percentage >= 100 ? 'var(--color-success)' : 'var(--color-primary)',
+                  backgroundColor: profile.completion.percentage >= 100 ? 'rgba(16, 185, 129, 0.1)' : 'var(--color-primary-light)',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: 'var(--radius-full)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                }}
+              >
+                {profile.completion.percentage >= 100 ? '✓ Complete' : `${profile.completion.percentage}% Complete`}
+              </span>
+            )}
 
             <Link to="/student/profile" style={{ textDecoration: 'none' }}>
               <Button size="sm" variant="outline">
@@ -127,6 +130,19 @@ export const StudentDashboard: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        {/* Profile Strength Compact Card */}
+        {profile?.completion && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <ProfileCompletionCard
+              completion={profile.completion}
+              title="Profile Strength"
+              editPath="/student/profile/edit"
+              ctaLabel="Improve Profile"
+              variant="compact"
+            />
+          </div>
+        )}
 
         {/* Profile Overview Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>

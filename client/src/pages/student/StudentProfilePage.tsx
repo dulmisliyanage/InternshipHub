@@ -14,6 +14,7 @@ import {
 import { Button, LoadingSpinner } from '../../components/ui';
 import { StudentNavbar } from '../../components/student/StudentNavbar';
 import { ProfileAvatar } from '../../components/student/profile/ProfileAvatar';
+import { ProfileCompletionCard } from '../../components/profile';
 import { studentService } from '../../services/student.service';
 import type { StudentProfile } from '../../types/student';
 
@@ -182,6 +183,20 @@ export const StudentProfilePage: React.FC = () => {
             </Button>
           </Link>
         </div>
+
+        {/* Profile Completion Card */}
+        {profile?.completion && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <ProfileCompletionCard
+              completion={profile.completion}
+              title="Complete your profile"
+              description="A complete profile helps you stand out and get discovered by top employers on InternshipHub."
+              editPath="/student/profile/edit"
+              ctaLabel="Complete Profile"
+              variant="full"
+            />
+          </div>
+        )}
 
         {/* About Section */}
         <div

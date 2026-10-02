@@ -12,6 +12,8 @@ export interface CompanyUserSummary {
   profileImage?: string | null;
 }
 
+import type { ProfileCompletion } from './profile';
+
 export interface CompanyProfile {
   id: string;
   userId: string;
@@ -23,6 +25,7 @@ export interface CompanyProfile {
   linkedinUrl?: string | null;
   description?: string | null;
   logoUrl?: string | null;
+  completion?: ProfileCompletion;
   createdAt: string;
   updatedAt: string;
   user?: CompanyUserSummary;

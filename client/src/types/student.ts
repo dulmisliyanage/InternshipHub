@@ -30,6 +30,8 @@ export interface SelectedSkill {
   proficiency: ProficiencyLevel;
 }
 
+import type { ProfileCompletion } from './profile';
+
 export interface StudentProfile {
   id: string;
   userId: string;
@@ -50,6 +52,7 @@ export interface StudentProfile {
   portfolioUrl?: string | null;
   cvUrl?: string | null;
   skills: StudentSkill[];
+  completion?: ProfileCompletion;
   createdAt?: string;
   updatedAt?: string;
 }

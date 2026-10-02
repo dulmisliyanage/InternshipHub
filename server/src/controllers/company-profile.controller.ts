@@ -5,6 +5,7 @@ import prisma from '../prisma';
 import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { updateCompanyProfileSchema } from '../validators/company-profile.validator';
+import { calculateCompanyProfileCompletion } from '../utils/profile-completion';
 
 /**
  * Format database company profile into a clean, safe response object.
@@ -23,6 +24,7 @@ function formatCompanyProfile(profile: any) {
     linkedinUrl: profile.linkedinUrl,
     description: profile.description,
     logoUrl: profile.logoUrl,
+    completion: calculateCompanyProfileCompletion(profile),
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
     user: profile.user

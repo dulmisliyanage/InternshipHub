@@ -5,6 +5,7 @@ import prisma from '../prisma';
 import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { updateStudentProfileSchema } from '../validators/student-profile.validator';
+import { calculateStudentProfileCompletion } from '../utils/profile-completion';
 
 /**
  * Format database student profile record into a clean, safe response object.
@@ -37,6 +38,7 @@ function formatProfileResponse(profile: any) {
       category: ss.skill.category?.name,
       proficiency: ss.proficiency,
     })),
+    completion: calculateStudentProfileCompletion(profile),
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   };
