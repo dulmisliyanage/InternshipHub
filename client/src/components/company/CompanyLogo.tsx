@@ -67,7 +67,8 @@ export const CompanyLogo: React.FC<CompanyLogoProps> = ({
         justifyContent: 'center',
         border: '1px solid var(--color-border)',
         boxShadow: 'var(--shadow-xs)',
-        backgroundColor: '#F0FDF4', // Light Emerald background
+        backgroundColor: hasImage ? '#FFFFFF' : '#ECFDF5', // Neutral surface for actual logo (transparency-friendly)
+        padding: hasImage ? '3px' : 0,
         ...style,
       }}
     >
@@ -79,7 +80,7 @@ export const CompanyLogo: React.FC<CompanyLogoProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: 'contain', // Organization logos use contain to preserve brand aspect ratio
             display: 'block',
           }}
         />

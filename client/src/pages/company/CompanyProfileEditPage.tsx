@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -6,7 +6,9 @@ import {
   Globe,
   Check,
   AlertCircle,
-  Sparkles,
+  Upload,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { Button, FormField, Input, Alert, LoadingSpinner } from '../../components/ui';
 import { CompanyNavbar } from '../../components/company/CompanyNavbar';
@@ -57,6 +59,7 @@ const emptyFormState: FormState = {
 
 export const CompanyProfileEditPage: React.FC = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Loading & Data States
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -68,10 +71,28 @@ export const CompanyProfileEditPage: React.FC = () => {
   const [initialData, setInitialData] = useState<FormState>(emptyFormState);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Logo Upload & Preview States
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [isRemovingLogo, setIsRemovingLogo] = useState<boolean>(false);
+  const [showRemoveLogoModal, setShowRemoveLogoModal] = useState<boolean>(false);
+  const [logoSuccessMsg, setLogoSuccessMsg] = useState<string | null>(null);
+
   // Submission & Modal States
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveStepText, setSaveStepText] = useState<string>('Saving changes...');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+    };
+  }, [logoPreviewUrl]);
 
   // 1. Load existing profile
   const fetchProfile = async () => {
@@ -115,6 +136,7 @@ export const CompanyProfileEditPage: React.FC = () => {
   // 2. Dirty Check
   const isDirty = useMemo(() => {
     return (
+      selectedLogoFile !== null ||
       formData.companyName !== initialData.companyName ||
       formData.industry !== initialData.industry ||
       formData.companySize !== initialData.companySize ||
@@ -123,7 +145,7 @@ export const CompanyProfileEditPage: React.FC = () => {
       formData.website !== initialData.website ||
       formData.linkedinUrl !== initialData.linkedinUrl
     );
-  }, [formData, initialData]);
+  }, [formData, initialData, selectedLogoFile]);
 
   // Field change handler
   const handleFieldChange = (field: keyof FormState, value: any) => {
@@ -147,14 +169,93 @@ export const CompanyProfileEditPage: React.FC = () => {
     }
   };
 
-  // Submit Handler
+  // Handle Logo file selection & validation
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLogoError(null);
+    setLogoSuccessMsg(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type (JPEG, PNG, WebP)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setLogoError('Please choose a JPG, PNG or WebP image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Validate size (max 5 MB)
+    const maxSizeBytes = 5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setLogoError('Logo must be smaller than 5 MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Revoke previous preview URL if any
+    if (logoPreviewUrl) {
+      URL.revokeObjectURL(logoPreviewUrl);
+    }
+
+    const preview = URL.createObjectURL(file);
+    setSelectedLogoFile(file);
+    setLogoPreviewUrl(preview);
+  };
+
+  // Revert local preview
+  const handleRevertLogo = () => {
+    if (logoPreviewUrl) {
+      URL.revokeObjectURL(logoPreviewUrl);
+    }
+    setSelectedLogoFile(null);
+    setLogoPreviewUrl(null);
+    setLogoError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Trigger Remove Confirmation or Revert
+  const handleRemoveLogoClick = () => {
+    if (selectedLogoFile && !profile?.logoUrl) {
+      handleRevertLogo();
+      return;
+    }
+    setShowRemoveLogoModal(true);
+  };
+
+  // Confirm Removal of Server Logo
+  const handleConfirmRemoveLogo = async () => {
+    setIsRemovingLogo(true);
+    setLogoError(null);
+    try {
+      await companyService.removeCompanyLogo();
+      // Clean local preview as well
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+      setSelectedLogoFile(null);
+      setLogoPreviewUrl(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Update local profile state
+      setProfile((prev) => (prev ? { ...prev, logoUrl: null } : null));
+      setShowRemoveLogoModal(false);
+      setLogoSuccessMsg('Company logo removed successfully.');
+    } catch (err: any) {
+      console.error('Failed to remove company logo:', err);
+      setLogoError(err?.message || 'Failed to remove company logo. Please try again.');
+      setShowRemoveLogoModal(false);
+    } finally {
+      setIsRemovingLogo(false);
+    }
+  };
+
+  // Submit Handler (Two-Phase: Logo first, then profile details)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const validationErrors = validateCompanyProfile(formData);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      // Scroll to top or first error
       window.scrollTo({ top: 120, behavior: 'smooth' });
       return;
     }
@@ -162,24 +263,42 @@ export const CompanyProfileEditPage: React.FC = () => {
     setIsSaving(true);
     setSaveError(null);
 
-    const payload: CompanyProfilePayload = {
-      companyName: formData.companyName.trim(),
-      industry: formData.industry.trim() || null,
-      companySize: formData.companySize || null,
-      location: formData.location.trim() || null,
-      description: formData.description.trim() || null,
-      website: formData.website.trim() || null,
-      linkedinUrl: formData.linkedinUrl.trim() || null,
-    };
-
     try {
+      // Phase 1: Upload logo if a new file is chosen
+      let updatedLogoUrl = profile?.logoUrl;
+      if (selectedLogoFile) {
+        setSaveStepText('Uploading company logo...');
+        const logoUploadRes = await companyService.uploadCompanyLogo(selectedLogoFile);
+        updatedLogoUrl = logoUploadRes.logoUrl;
+      }
+
+      // Phase 2: Save company information
+      setSaveStepText('Saving company information...');
+      const payload: CompanyProfilePayload = {
+        companyName: formData.companyName.trim(),
+        industry: formData.industry.trim() || null,
+        companySize: formData.companySize || null,
+        location: formData.location.trim() || null,
+        description: formData.description.trim() || null,
+        website: formData.website.trim() || null,
+        linkedinUrl: formData.linkedinUrl.trim() || null,
+        logoUrl: updatedLogoUrl,
+      };
+
       await companyService.updateCompanyProfile(payload);
+
+      // Clean preview URL
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+
       // Success: return immediately to /company/profile
       navigate('/company/profile', { replace: true });
     } catch (err: any) {
       console.error('Failed to update company profile:', err);
       setSaveError(
         err?.response?.data?.message ||
+        err?.message ||
           "We couldn't update your company profile. Your changes haven't been lost. Please try again."
       );
     } finally {
@@ -262,9 +381,15 @@ export const CompanyProfileEditPage: React.FC = () => {
     );
   }
 
+  const displayedLogoSrc = logoPreviewUrl || profile?.logoUrl;
+  const hasActiveLogo = !!displayedLogoSrc;
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)', paddingBottom: '5rem' }}>
-      <CompanyNavbar companyName={formData.companyName || profile?.companyName} logoUrl={profile?.logoUrl} />
+      <CompanyNavbar
+        companyName={formData.companyName || profile?.companyName}
+        logoUrl={displayedLogoSrc}
+      />
 
       <main style={{ maxWidth: '860px', margin: '2rem auto 0', padding: '0 1.5rem' }}>
         {/* Back Link */}
@@ -318,8 +443,17 @@ export const CompanyProfileEditPage: React.FC = () => {
           </div>
         )}
 
+        {/* Logo Removal Success Alert */}
+        {logoSuccessMsg && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <Alert variant="success" title="Success">
+              {logoSuccessMsg}
+            </Alert>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Section 1: Company Identity */}
+          {/* Section 1: Company Logo / Identity */}
           <div
             style={{
               backgroundColor: 'var(--color-surface)',
@@ -340,37 +474,93 @@ export const CompanyProfileEditPage: React.FC = () => {
                 paddingBottom: '0.75rem',
               }}
             >
-              Company Identity
+              Company Logo
             </h2>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={handleFileSelect}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.75rem', flexWrap: 'wrap' }}>
               <CompanyLogo
-                src={profile?.logoUrl}
+                src={displayedLogoSrc}
                 name={formData.companyName || 'Company'}
-                size={72}
+                size={84}
               />
 
-              <div style={{ flex: 1, minWidth: '240px' }}>
-                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
-                  {formData.companyName || 'Your Company Name'}
+              <div style={{ flex: 1, minWidth: '260px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.65rem' }}>
+                  <Button
+                    type="button"
+                    variant={hasActiveLogo ? 'outline' : 'primary'}
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+                  >
+                    <Upload size={14} />
+                    <span>{hasActiveLogo ? 'Change Logo' : 'Upload Logo'}</span>
+                  </Button>
+
+                  {selectedLogoFile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRevertLogo}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-text-secondary)' }}
+                    >
+                      <RotateCcw size={14} />
+                      <span>Revert</span>
+                    </Button>
+                  )}
+
+                  {profile?.logoUrl && !selectedLogoFile && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveLogoClick}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-error)' }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Remove</span>
+                    </Button>
+                  )}
                 </div>
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.825rem',
-                    color: '#065F46',
-                    backgroundColor: '#ECFDF5',
-                    border: '1px solid #A7F3D0',
-                    padding: '0.3rem 0.65rem',
-                    borderRadius: 'var(--radius-md)',
-                    fontWeight: 600,
-                  }}
-                >
-                  <Sparkles size={13} />
-                  <span>Company logo upload will be available in the next release</span>
-                </div>
+
+                {selectedLogoFile && (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontSize: '0.8rem',
+                      color: 'var(--color-primary)',
+                      backgroundColor: 'var(--color-primary-light)',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontWeight: 600,
+                      marginBottom: '0.4rem',
+                    }}
+                  >
+                    <span>Local preview (will be uploaded on Save Changes)</span>
+                  </div>
+                )}
+
+                <p style={{ margin: 0, fontSize: '0.825rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  JPG, PNG or WebP. Maximum 5 MB. Recommended: square logo with clear padding.
+                </p>
+
+                {logoError && (
+                  <p style={{ margin: '0.4rem 0 0', fontSize: '0.825rem', color: 'var(--color-error)', fontWeight: 500 }}>
+                    {logoError}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -719,11 +909,95 @@ export const CompanyProfileEditPage: React.FC = () => {
               isLoading={isSaving}
               disabled={isSaving}
             >
-              {isSaving ? 'Saving changes...' : 'Save Changes'}
+              {isSaving ? saveStepText : 'Save Changes'}
             </Button>
           </div>
         </form>
       </main>
+
+      {/* Remove Logo Confirmation Modal */}
+      {showRemoveLogoModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '2rem',
+              maxWidth: '440px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 size={22} />
+              </div>
+              <h3
+                style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                Remove company logo?
+              </h3>
+            </div>
+
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
+              Your logo will be removed from your company profile and replaced with the initials fallback.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRemoveLogoModal(false)}
+                disabled={isRemovingLogo}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={handleConfirmRemoveLogo}
+                isLoading={isRemovingLogo}
+                disabled={isRemovingLogo}
+              >
+                {isRemovingLogo ? 'Removing...' : 'Remove Logo'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Discard Unsaved Changes Modal */}
       {showDiscardModal && (

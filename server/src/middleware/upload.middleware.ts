@@ -31,9 +31,9 @@ const multerInstance = multer({
 
 /**
  * Validate magic bytes in the file buffer to prevent extension spoofing
- * (e.g. PDF or EXE renamed to .jpg).
+ * (e.g. PDF, SVG, or EXE renamed to .jpg).
  */
-function isValidImageBuffer(buffer: Buffer): boolean {
+export function isValidImageBuffer(buffer: Buffer): boolean {
   if (!buffer || buffer.length < 12) return false;
 
   // JPEG: FF D8 FF
@@ -62,55 +62,63 @@ function isValidImageBuffer(buffer: Buffer): boolean {
 }
 
 /**
- * Middleware for single image upload on the "image" field.
+ * General single-image uploader middleware factory for any field name.
  */
-export function uploadProfilePicture(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
-  multerInstance.single('image')(req, res, (err: any) => {
-    if (err) {
-      if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
+export function createSingleImageUploader(fieldName: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    multerInstance.single(fieldName)(req, res, (err: any) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            res.status(400).json({
+              status: 'error',
+              message: 'Image size exceeds the 5MB limit. Please upload a smaller image.',
+            });
+            return;
+          }
           res.status(400).json({
             status: 'error',
-            message: 'Image size exceeds the 5MB limit. Please upload a smaller image.',
+            message: `Upload error: ${err.message}`,
           });
           return;
         }
+
         res.status(400).json({
           status: 'error',
-          message: `Upload error: ${err.message}`,
+          message: err.message || 'Invalid image upload',
         });
         return;
       }
 
-      res.status(400).json({
-        status: 'error',
-        message: err.message || 'Invalid image upload',
-      });
-      return;
-    }
+      if (!req.file) {
+        res.status(400).json({
+          status: 'error',
+          message: `No image file uploaded. Please provide an image in the "${fieldName}" field.`,
+        });
+        return;
+      }
 
-    if (!req.file) {
-      res.status(400).json({
-        status: 'error',
-        message: 'No image file uploaded. Please provide an image in the "image" field.',
-      });
-      return;
-    }
+      // Deep validation of magic bytes
+      if (!isValidImageBuffer(req.file.buffer)) {
+        res.status(400).json({
+          status: 'error',
+          message:
+            'Invalid file content. The file is not a valid JPEG, PNG, or WebP image.',
+        });
+        return;
+      }
 
-    // Deep validation of magic bytes
-    if (!isValidImageBuffer(req.file.buffer)) {
-      res.status(400).json({
-        status: 'error',
-        message:
-          'Invalid file content. The file is not a valid JPEG, PNG, or WebP image.',
-      });
-      return;
-    }
-
-    next();
-  });
+      next();
+    });
+  };
 }
+
+/**
+ * Middleware for single image upload on the "image" field (Student profile photo).
+ */
+export const uploadProfilePicture = createSingleImageUploader('image');
+
+/**
+ * Middleware for single image upload on the "logo" field (Company logo).
+ */
+export const uploadCompanyLogo = createSingleImageUploader('logo');

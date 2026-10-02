@@ -1,8 +1,11 @@
 import { Router, Response } from 'express';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { uploadCompanyLogo as uploadCompanyLogoMiddleware } from '../middleware/upload.middleware';
 import {
   getCompanyProfile,
   updateCompanyProfile,
+  uploadCompanyLogo,
+  deleteCompanyLogo,
 } from '../controllers/company-profile.controller';
 
 const router = Router();
@@ -13,6 +16,10 @@ router.use(authenticate, requireRole('COMPANY'));
 // Company Profile Management
 router.get('/profile', getCompanyProfile);
 router.put('/profile', updateCompanyProfile);
+
+// Company Logo Management
+router.put('/profile/logo', uploadCompanyLogoMiddleware, uploadCompanyLogo);
+router.delete('/profile/logo', deleteCompanyLogo);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
