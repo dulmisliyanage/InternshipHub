@@ -1,5 +1,8 @@
 import { Response } from 'express';
+import { Readable } from 'stream';
+import type { UploadApiResponse } from 'cloudinary';
 import prisma from '../prisma';
+import cloudinary, { isCloudinaryConfigured } from '../config/cloudinary';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { updateStudentProfileSchema } from '../validators/student-profile.validator';
 
@@ -306,3 +309,137 @@ export async function getSkillsCatalog(
     });
   }
 }
+
+/**
+ * PUT /api/student/profile/image
+ * Uploads a profile image to Cloudinary and saves the secure_url in User.profileImage.
+ */
+export async function uploadProfileImage(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({
+      status: 'error',
+      message: 'No image file provided in "image" field',
+    });
+    return;
+  }
+
+  // Check if Cloudinary is configured with valid credentials
+  if (!isCloudinaryConfigured()) {
+    res.status(503).json({
+      status: 'error',
+      message:
+        'Cloudinary image storage is not yet configured. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in server/.env.',
+    });
+    return;
+  }
+
+  try {
+    // Upload buffer to Cloudinary with stable public ID: student_<userId>
+    const publicId = `student_${userId}`;
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'internshiphub/profiles',
+          public_id: publicId,
+          overwrite: true,
+          invalidate: true,
+          resource_type: 'image',
+          transformation: [
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+            { quality: 'auto', fetch_format: 'auto' },
+          ],
+        },
+        (error, uploadResult) => {
+          if (error || !uploadResult) {
+            return reject(error || new Error('Upload to Cloudinary failed'));
+          }
+          resolve(uploadResult);
+        }
+      );
+
+      Readable.from(req.file!.buffer).pipe(uploadStream);
+    });
+
+    // Update User.profileImage in Neon database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: result.secure_url },
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Profile photo updated successfully',
+      profileImage: result.secure_url,
+    });
+  } catch (error) {
+    console.error('Error uploading profile image to Cloudinary:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload profile image to cloud storage',
+    });
+  }
+}
+
+/**
+ * DELETE /api/student/profile/image
+ * Deletes the profile image from Cloudinary and sets User.profileImage to null.
+ */
+export async function deleteProfileImage(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    res.status(401).json({
+      status: 'error',
+      message: 'Authentication required',
+    });
+    return;
+  }
+
+  try {
+    // If Cloudinary is configured, delete asset from Cloudinary
+    if (isCloudinaryConfigured()) {
+      try {
+        await cloudinary.uploader.destroy(`internshiphub/profiles/student_${userId}`, {
+          invalidate: true,
+        });
+      } catch (cloudErr) {
+        console.warn('Could not destroy Cloudinary asset (it may not exist):', cloudErr);
+      }
+    }
+
+    // Set User.profileImage to null in Neon database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: null },
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Profile photo removed successfully',
+      profileImage: null,
+    });
+  } catch (error) {
+    console.error('Error deleting profile image:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to remove profile image',
+    });
+  }
+}
+

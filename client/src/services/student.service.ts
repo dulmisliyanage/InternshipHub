@@ -68,4 +68,38 @@ export const studentService = {
   async getSkillCatalog(): Promise<SkillsCatalogResponse> {
     return this.getSkills();
   },
+
+  /**
+   * Upload student profile picture to Cloudinary.
+   */
+  async uploadProfileImage(file: File): Promise<{ status: string; message: string; profileImage: string }> {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const res = await fetch(`${API_BASE}/profile/image`, {
+      method: 'PUT',
+      credentials: 'include',
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new ApiError(
+        data.message || `Upload failed with status ${res.status}`,
+        res.status,
+        data.errors
+      );
+    }
+    return data;
+  },
+
+  /**
+   * Remove student profile picture from Cloudinary and reset User.profileImage to null.
+   */
+  async removeProfileImage(): Promise<{ status: string; message: string; profileImage: null }> {
+    return studentApiRequest<{ status: string; message: string; profileImage: null }>(
+      '/profile/image',
+      { method: 'DELETE' }
+    );
+  },
 };

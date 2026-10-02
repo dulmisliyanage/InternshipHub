@@ -8,11 +8,13 @@ import {
   MapPin,
   Check,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { Button, FormField, Input, Alert, LoadingSpinner } from '../../components/ui';
 import { StudentNavbar } from '../../components/student/StudentNavbar';
 import { ProfileAvatar } from '../../components/student/profile/ProfileAvatar';
 import { SkillEditor } from '../../components/student/profile/SkillEditor';
+import { useAuth } from '../../context/AuthContext';
 import { studentService } from '../../services/student.service';
 import { ApiError } from '../../services/auth.service';
 import type {
@@ -61,6 +63,7 @@ const emptyFormState: FormState = {
 export const StudentProfileEditPage: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { updateUser, refreshUser } = useAuth();
 
   // Loading & Data States
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -72,12 +75,17 @@ export const StudentProfileEditPage: React.FC = () => {
   const [formData, setFormData] = useState<FormState>(emptyFormState);
   const [initialData, setInitialData] = useState<FormState>(emptyFormState);
 
-  // Profile Image preview state
+  // Profile Image preview & upload states
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isRemovingPhoto, setIsRemovingPhoto] = useState<boolean>(false);
+  const [showRemoveModal, setShowRemoveModal] = useState<boolean>(false);
+  const [photoSuccessMsg, setPhotoSuccessMsg] = useState<string | null>(null);
 
   // UI & Submit States
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveStepText, setSaveStepText] = useState<string>('Saving changes...');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
@@ -162,13 +170,14 @@ export const StudentProfileEditPage: React.FC = () => {
 
   // Compute dirty state
   const isDirty = useMemo(() => {
-    if (previewImage !== null) return true;
+    if (selectedFile !== null) return true;
     return JSON.stringify(formData) !== JSON.stringify(initialData);
-  }, [formData, initialData, previewImage]);
+  }, [formData, initialData, selectedFile]);
 
   // Handle Photo Picker Selection
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImageError(null);
+    setPhotoSuccessMsg(null);
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -187,7 +196,31 @@ export const StudentProfileEditPage: React.FC = () => {
     }
 
     const objectUrl = URL.createObjectURL(file);
+    setSelectedFile(file);
     setPreviewImage(objectUrl);
+  };
+
+  // Handle Remove Profile Photo Confirm
+  const handleRemovePhotoConfirm = async () => {
+    setIsRemovingPhoto(true);
+    setImageError(null);
+    setPhotoSuccessMsg(null);
+
+    try {
+      await studentService.removeProfileImage();
+      setProfile((prev) => (prev ? { ...prev, profileImage: null } : null));
+      setPreviewImage(null);
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      updateUser({ profileImage: null });
+      await refreshUser();
+      setShowRemoveModal(false);
+      setPhotoSuccessMsg('Profile photo removed. Initial avatar fallback active.');
+    } catch (err: any) {
+      setImageError(err.message || 'Failed to remove profile photo.');
+    } finally {
+      setIsRemovingPhoto(false);
+    }
   };
 
   // Skill Editor Handlers
@@ -245,8 +278,30 @@ export const StudentProfileEditPage: React.FC = () => {
     if (e) e.preventDefault();
     setIsSaving(true);
     setErrorMessage(null);
+    setSaveStepText('Saving changes...');
 
     try {
+      // 1. If a new photo was selected, upload it first to Cloudinary
+      if (selectedFile) {
+        setSaveStepText('Uploading photo securely...');
+        try {
+          const uploadRes = await studentService.uploadProfileImage(selectedFile);
+          if (uploadRes?.profileImage) {
+            updateUser({ profileImage: uploadRes.profileImage });
+            setProfile((prev) => (prev ? { ...prev, profileImage: uploadRes.profileImage } : null));
+          }
+        } catch (photoErr: any) {
+          setErrorMessage(
+            photoErr?.message ||
+              "Couldn't upload your photo. Your other profile changes have not been lost. Please try again."
+          );
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // 2. Save profile information
+      setSaveStepText('Saving profile information...');
       let gradIso: string | null = null;
       if (formData.expectedGraduation) {
         gradIso = new Date(`${formData.expectedGraduation}-01`).toISOString();
@@ -273,6 +328,7 @@ export const StudentProfileEditPage: React.FC = () => {
       };
 
       await studentService.updateStudentProfile(payload);
+      await refreshUser();
 
       setSaveSuccess(true);
       setTimeout(() => {
@@ -409,19 +465,17 @@ export const StudentProfileEditPage: React.FC = () => {
             </h2>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative' }}>
-                <ProfileAvatar src={displayAvatar} name={displayName} size={88} />
-              </div>
+              <ProfileAvatar src={displayAvatar} name={displayName} size={88} />
 
-              <div>
+              <div style={{ flex: 1, minWidth: '240px' }}>
                 <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)', marginBottom: '0.25rem' }}>
                   {displayName}
                 </div>
-                <div style={{ fontSize: '0.825rem', color: 'var(--color-text-secondary)', marginBottom: '0.75rem' }}>
-                  Allowed formats: JPEG, PNG, or WebP. Max 5MB.
+                <div style={{ fontSize: '0.825rem', color: 'var(--color-text-secondary)', marginBottom: '0.85rem' }}>
+                  Allowed formats: JPG, PNG, or WebP. Maximum 5 MB.
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -437,32 +491,55 @@ export const StudentProfileEditPage: React.FC = () => {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Camera size={14} />
-                    <span>Change Photo</span>
+                    <span>{displayAvatar ? 'Change Photo' : 'Upload Photo'}</span>
                   </Button>
 
-                  {previewImage && (
+                  {/* Revert preview if user selected a new file */}
+                  {selectedFile && (
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
                       onClick={() => {
                         setPreviewImage(null);
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
                     >
                       Revert
                     </Button>
                   )}
+
+                  {/* Remove photo button if photo exists and no file is pending */}
+                  {profile?.profileImage && !selectedFile && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowRemoveModal(true)}
+                      style={{ color: 'var(--color-error)' }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Remove</span>
+                    </Button>
+                  )}
                 </div>
 
                 {imageError && (
-                  <div style={{ color: 'var(--color-error)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                  <div style={{ color: 'var(--color-error)', fontSize: '0.85rem', marginTop: '0.65rem' }}>
                     {imageError}
                   </div>
                 )}
 
-                {previewImage && !imageError && (
-                  <div style={{ color: 'var(--color-success)', fontSize: '0.8rem', marginTop: '0.5rem', fontWeight: 500 }}>
-                    ✓ Image preview ready (Cloud upload connects in Step 3.4B)
+                {photoSuccessMsg && (
+                  <div style={{ color: 'var(--color-success)', fontSize: '0.85rem', marginTop: '0.65rem', fontWeight: 600 }}>
+                    ✓ {photoSuccessMsg}
+                  </div>
+                )}
+
+                {selectedFile && !imageError && (
+                  <div style={{ color: 'var(--color-primary)', fontSize: '0.825rem', marginTop: '0.65rem', fontWeight: 600 }}>
+                    ✓ Photo ready to upload on "Save Changes"
                   </div>
                 )}
               </div>
@@ -844,7 +921,7 @@ export const StudentProfileEditPage: React.FC = () => {
               size="md"
               isLoading={isSaving}
             >
-              {isSaving ? 'Saving changes...' : 'Save Changes'}
+              {isSaving ? saveStepText : 'Save Changes'}
             </Button>
           </div>
         </form>
@@ -927,6 +1004,88 @@ export const StudentProfileEditPage: React.FC = () => {
                 }}
               >
                 Discard Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Photo Confirmation Modal */}
+      {showRemoveModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '1.5rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: 'var(--radius-xl)',
+              padding: '2rem',
+              maxWidth: '440px',
+              width: '100%',
+              boxShadow: 'var(--shadow-xl)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fef2f2',
+                  color: 'var(--color-error)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Trash2 size={20} />
+              </div>
+              <h3
+                style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                Remove profile photo?
+              </h3>
+            </div>
+
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
+              This will remove your photo from cloud storage and return your avatar to your initials fallback.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRemoveModal(false)}
+                disabled={isRemovingPhoto}
+              >
+                Keep Photo
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={handleRemovePhotoConfirm}
+                isLoading={isRemovingPhoto}
+              >
+                {isRemovingPhoto ? 'Removing...' : 'Remove Photo'}
               </Button>
             </div>
           </div>

@@ -1,9 +1,12 @@
 import { Router, Response } from 'express';
 import { authenticate, requireRole, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { uploadProfilePicture } from '../middleware/upload.middleware';
 import {
   getStudentProfile,
   updateStudentProfile,
   getSkillsCatalog,
+  uploadProfileImage,
+  deleteProfileImage,
 } from '../controllers/student-profile.controller';
 
 const router = Router();
@@ -15,6 +18,10 @@ router.use(authenticate, requireRole('STUDENT'));
 router.get('/profile', getStudentProfile);
 router.put('/profile', updateStudentProfile);
 router.get('/skills', getSkillsCatalog);
+
+// Profile Picture Management
+router.put('/profile/image', uploadProfilePicture, uploadProfileImage);
+router.delete('/profile/image', deleteProfileImage);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
