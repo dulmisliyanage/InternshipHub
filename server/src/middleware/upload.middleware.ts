@@ -66,7 +66,7 @@ export function isValidImageBuffer(buffer: Buffer): boolean {
  */
 export function createSingleImageUploader(fieldName: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    multerInstance.single(fieldName)(req, res, (err: any) => {
+    multerInstance.single(fieldName)(req, res, (err: unknown) => {
       if (err) {
         if (err instanceof multer.MulterError) {
           if (err.code === 'LIMIT_FILE_SIZE') {
@@ -83,9 +83,10 @@ export function createSingleImageUploader(fieldName: string) {
           return;
         }
 
+        const errorMessage = err instanceof Error ? err.message : 'Invalid image upload';
         res.status(400).json({
           status: 'error',
-          message: err.message || 'Invalid image upload',
+          message: errorMessage,
         });
         return;
       }

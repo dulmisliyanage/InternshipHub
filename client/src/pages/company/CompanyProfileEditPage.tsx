@@ -18,6 +18,7 @@ import {
   validateCompanyProfile,
 } from '../../utils/company';
 import { companyService } from '../../services/company.service';
+import { validateImageFile, ALLOWED_IMAGE_EXTENSIONS } from '../../utils/upload';
 import type { CompanySize, CompanyProfile, CompanyProfilePayload } from '../../types/company';
 
 const LinkedinIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -148,7 +149,7 @@ export const CompanyProfileEditPage: React.FC = () => {
   }, [formData, initialData, selectedLogoFile]);
 
   // Field change handler
-  const handleFieldChange = (field: keyof FormState, value: any) => {
+  const handleFieldChange = (field: keyof FormState, value: FormState[keyof FormState]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => {
@@ -176,18 +177,9 @@ export const CompanyProfileEditPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate type (JPEG, PNG, WebP)
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      setLogoError('Please choose a JPG, PNG or WebP image.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // Validate size (max 5 MB)
-    const maxSizeBytes = 5 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      setLogoError('Logo must be smaller than 5 MB.');
+    const validationErr = validateImageFile(file);
+    if (validationErr) {
+      setLogoError(validationErr);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -240,9 +232,10 @@ export const CompanyProfileEditPage: React.FC = () => {
       setProfile((prev) => (prev ? { ...prev, logoUrl: null } : null));
       setShowRemoveLogoModal(false);
       setLogoSuccessMsg('Company logo removed successfully.');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to remove company logo:', err);
-      setLogoError(err?.message || 'Failed to remove company logo. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Failed to remove company logo. Please try again.';
+      setLogoError(msg);
       setShowRemoveLogoModal(false);
     } finally {
       setIsRemovingLogo(false);
@@ -294,13 +287,13 @@ export const CompanyProfileEditPage: React.FC = () => {
 
       // Success: return immediately to /company/profile
       navigate('/company/profile', { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update company profile:', err);
-      setSaveError(
-        err?.response?.data?.message ||
-        err?.message ||
-          "We couldn't update your company profile. Your changes haven't been lost. Please try again."
-      );
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "We couldn't update your company profile. Your changes haven't been lost. Please try again.";
+      setSaveError(msg);
     } finally {
       setIsSaving(false);
     }
@@ -481,7 +474,7 @@ export const CompanyProfileEditPage: React.FC = () => {
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/jpeg,image/png,image/webp"
+              accept={ALLOWED_IMAGE_EXTENSIONS}
               style={{ display: 'none' }}
               onChange={handleFileSelect}
             />

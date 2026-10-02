@@ -99,7 +99,7 @@ export const CompanyOnboardingPage: React.FC = () => {
     }
   }, [formData]);
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (stepErrors[field]) {
       setStepErrors((prev) => {

@@ -2,24 +2,17 @@ import React from 'react';
 import { Users, MapPin, ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { Button, FormField, Input } from '../../ui';
 import type { CompanySize } from '../../../types/company';
+import { COMPANY_SIZE_OPTIONS } from '../../../utils/company';
 
 interface CompanyDetailsStepProps {
   companySize: CompanySize | null;
   location: string;
   description: string;
   errors: { [key: string]: string };
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: CompanySize | string) => void;
   onBack: () => void;
   onNext: () => void;
 }
-
-const companySizeOptions: { value: CompanySize; label: string; desc: string }[] = [
-  { value: 'STARTUP', label: 'Startup', desc: '< 10 team members' },
-  { value: 'SMALL', label: 'Small', desc: '10 – 50 team members' },
-  { value: 'MEDIUM', label: 'Medium', desc: '50 – 250 team members' },
-  { value: 'LARGE', label: 'Large', desc: '250 – 1,000 team members' },
-  { value: 'ENTERPRISE', label: 'Enterprise', desc: '1,000+ team members' },
-];
 
 export const CompanyDetailsStep: React.FC<CompanyDetailsStepProps> = ({
   companySize,
@@ -94,7 +87,7 @@ export const CompanyDetailsStep: React.FC<CompanyDetailsStepProps> = ({
               gap: '0.65rem',
             }}
           >
-            {companySizeOptions.map((opt) => {
+            {COMPANY_SIZE_OPTIONS.map((opt) => {
               const isSelected = companySize === opt.value;
               return (
                 <button
@@ -148,7 +141,7 @@ export const CompanyDetailsStep: React.FC<CompanyDetailsStepProps> = ({
                       color: 'var(--color-text-secondary)',
                     }}
                   >
-                    {opt.desc}
+                    {opt.description}
                   </span>
                 </button>
               );

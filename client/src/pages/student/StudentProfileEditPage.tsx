@@ -17,6 +17,7 @@ import { SkillEditor } from '../../components/student/profile/SkillEditor';
 import { useAuth } from '../../context/AuthContext';
 import { studentService } from '../../services/student.service';
 import { ApiError } from '../../services/auth.service';
+import { validateImageFile, ALLOWED_IMAGE_EXTENSIONS } from '../../utils/upload';
 import type {
   StudentProfile,
   SkillCategory,
@@ -182,16 +183,9 @@ export const StudentProfileEditPage: React.FC = () => {
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-    if (!allowedTypes.includes(file.type)) {
-      setImageError('Please select a valid image file (JPEG, PNG, or WebP).');
-      return;
-    }
-
-    // 5MB limit
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image file size must be less than 5MB.');
+    const validationErr = validateImageFile(file);
+    if (validationErr) {
+      setImageError(validationErr);
       return;
     }
 
@@ -216,8 +210,9 @@ export const StudentProfileEditPage: React.FC = () => {
       await refreshUser();
       setShowRemoveModal(false);
       setPhotoSuccessMsg('Profile photo removed. Initial avatar fallback active.');
-    } catch (err: any) {
-      setImageError(err.message || 'Failed to remove profile photo.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to remove profile photo.';
+      setImageError(msg);
     } finally {
       setIsRemovingPhoto(false);
     }
@@ -290,11 +285,12 @@ export const StudentProfileEditPage: React.FC = () => {
             updateUser({ profileImage: uploadRes.profileImage });
             setProfile((prev) => (prev ? { ...prev, profileImage: uploadRes.profileImage } : null));
           }
-        } catch (photoErr: any) {
-          setErrorMessage(
-            photoErr?.message ||
-              "Couldn't upload your photo. Your other profile changes have not been lost. Please try again."
-          );
+        } catch (photoErr: unknown) {
+          const msg =
+            photoErr instanceof Error
+              ? photoErr.message
+              : "Couldn't upload your photo. Your other profile changes have not been lost. Please try again.";
+          setErrorMessage(msg);
           setIsSaving(false);
           return;
         }
@@ -479,7 +475,7 @@ export const StudentProfileEditPage: React.FC = () => {
                   <input
                     type="file"
                     ref={fileInputRef}
-                    accept="image/jpeg,image/png,image/webp"
+                    accept={ALLOWED_IMAGE_EXTENSIONS}
                     onChange={handlePhotoSelect}
                     style={{ display: 'none' }}
                   />

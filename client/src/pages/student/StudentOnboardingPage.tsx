@@ -122,11 +122,10 @@ export const StudentOnboardingPage: React.FC = () => {
       if (res.categories) {
         setCategories(res.categories);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load skill catalog:', err);
-      setCatalogError(
-        err.message || 'We could not load the skill catalog. Please try again.'
-      );
+      const msg = err instanceof Error ? err.message : 'We could not load the skill catalog. Please try again.';
+      setCatalogError(msg);
     } finally {
       setIsLoadingSkills(false);
     }
@@ -146,7 +145,7 @@ export const StudentOnboardingPage: React.FC = () => {
   }, [formData]);
 
   // Field change helpers
-  const handleFieldChange = (field: keyof FormState, value: any) => {
+  const handleFieldChange = (field: keyof FormState, value: FormState[keyof FormState]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (stepErrors[field]) {
       setStepErrors((prev) => {
@@ -353,15 +352,13 @@ export const StudentOnboardingPage: React.FC = () => {
 
       // Display polished success screen
       setIsSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to complete onboarding profile:', err);
       if (err instanceof ApiError && err.errors && err.errors.length > 0) {
         setApiError(err.errors.map((e) => e.message).join('. '));
       } else {
-        setApiError(
-          err.message ||
-            "We couldn't save your profile. Your information is still here. Please try again."
-        );
+        const msg = err instanceof Error ? err.message : "We couldn't save your profile. Your information is still here. Please try again.";
+        setApiError(msg);
       }
     } finally {
       setIsSubmitting(false);

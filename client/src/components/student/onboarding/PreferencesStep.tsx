@@ -11,7 +11,7 @@ export interface PreferencesData {
 interface PreferencesStepProps {
   data: PreferencesData;
   errors: { [key: string]: string };
-  onChange: (field: keyof PreferencesData, value: any) => void;
+  onChange: (field: keyof PreferencesData, value: PreferencesData[keyof PreferencesData]) => void;
   onBack: () => void;
   onNext: () => void;
 }

@@ -41,7 +41,36 @@ export const COMPANY_COMPLETION_WEIGHTS = {
   linkedinUrl: 10,
 } as const;
 
-function hasValue(val: any): boolean {
+export interface StudentProfileCompletionInput {
+  user?: { profileImage?: string | null } | null;
+  profileImage?: string | null;
+  university?: string | null;
+  degree?: string | null;
+  fieldOfStudy?: string | null;
+  currentYear?: number | string | null;
+  expectedGraduation?: Date | string | null;
+  location?: string | null;
+  preferredRole?: string | null;
+  preferredWorkType?: string | null;
+  bio?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  portfolioUrl?: string | null;
+  skills?: Array<unknown> | null;
+}
+
+export interface CompanyProfileCompletionInput {
+  companyName?: string | null;
+  industry?: string | null;
+  companySize?: string | null;
+  location?: string | null;
+  description?: string | null;
+  logoUrl?: string | null;
+  website?: string | null;
+  linkedinUrl?: string | null;
+}
+
+function hasValue(val: unknown): boolean {
   if (val === null || val === undefined) return false;
   if (typeof val === 'string') return val.trim().length > 0;
   return true;
@@ -66,7 +95,9 @@ function hasValue(val: any): boolean {
  * - GitHub OR Portfolio: 5
  * Total: 100
  */
-export function calculateStudentProfileCompletion(profileData: any): ProfileCompletion {
+export function calculateStudentProfileCompletion(
+  profileData?: StudentProfileCompletionInput | null
+): ProfileCompletion {
   if (!profileData) {
     return {
       percentage: 0,
@@ -190,7 +221,9 @@ export function calculateStudentProfileCompletion(profileData: any): ProfileComp
  * - LinkedIn: 10
  * Total: 100
  */
-export function calculateCompanyProfileCompletion(profileData: any): ProfileCompletion {
+export function calculateCompanyProfileCompletion(
+  profileData?: CompanyProfileCompletionInput | null
+): ProfileCompletion {
   if (!profileData) {
     return {
       percentage: 0,

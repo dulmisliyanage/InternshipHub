@@ -1,24 +1,5 @@
 import { z } from 'zod';
-
-const optionalUrl = z
-  .string()
-  .trim()
-  .refine(
-    (val) => {
-      if (!val) return true;
-      try {
-        const parsed = new URL(val);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    },
-    { message: 'Must be a valid URL starting with http:// or https://' }
-  )
-  .transform((val) => (val ? val : null))
-  .nullable()
-  .optional()
-  .or(z.literal('').transform(() => null));
+import { optionalUrl } from './common.validator';
 
 const optionalDate = z
   .union([
