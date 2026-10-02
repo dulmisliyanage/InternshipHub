@@ -15,6 +15,8 @@ import { StudentProfilePage } from './pages/student/StudentProfilePage';
 import { StudentProfileEditPage } from './pages/student/StudentProfileEditPage';
 import { CompanyDashboard } from './pages/company/CompanyDashboard';
 import { CompanyOnboardingPage } from './pages/company/CompanyOnboardingPage';
+import { CompanyProfilePage } from './pages/company/CompanyProfilePage';
+import { CompanyProfileEditPage } from './pages/company/CompanyProfileEditPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 
 export const App: React.FC = () => {
@@ -39,6 +41,8 @@ export const App: React.FC = () => {
           <Route element={<ProtectedRoute allowedRoles={['COMPANY']} />}>
             <Route path="/company/dashboard" element={<CompanyDashboard />} />
             <Route path="/company/onboarding" element={<CompanyOnboardingPage />} />
+            <Route path="/company/profile" element={<CompanyProfilePage />} />
+            <Route path="/company/profile/edit" element={<CompanyProfileEditPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>

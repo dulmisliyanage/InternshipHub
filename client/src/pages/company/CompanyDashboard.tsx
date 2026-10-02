@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { CompanyNavbar } from '../../components/company/CompanyNavbar';
 import { CompanyLogo } from '../../components/company/CompanyLogo';
+import { formatCompanySize } from '../../utils/company';
 import { useAuth } from '../../context/AuthContext';
 import { companyService } from '../../services/company.service';
 import type { CompanyProfile } from '../../types/company';
 
 export const CompanyDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -43,18 +44,6 @@ export const CompanyDashboard: React.FC = () => {
     };
   }, [navigate]);
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await logout();
-      navigate('/login', { replace: true });
-    } catch (err) {
-      console.error('Logout failed:', err);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <div
@@ -81,60 +70,10 @@ export const CompanyDashboard: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)', paddingBottom: '4rem' }}>
-      {/* Top Bar */}
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: 'var(--color-surface)',
-          borderBottom: '1px solid var(--color-border)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <span className="logo" style={{ fontSize: '1.25rem', fontWeight: 800 }}>
-              Internship<span style={{ color: 'var(--color-primary)' }}>Hub</span>
-            </span>
-          </Link>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: '#065F46',
-              backgroundColor: '#ECFDF5',
-              border: '1px solid #A7F3D0',
-              padding: '0.2rem 0.6rem',
-              borderRadius: 'var(--radius-full)',
-            }}
-          >
-            COMPANY PORTAL
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <CompanyLogo src={profile?.logoUrl} name={companyDisplayName} size="sm" />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {companyDisplayName}
-            </span>
-          </div>
-
-          <Button
-            id="company-logout-btn"
-            size="sm"
-            variant="ghost"
-            onClick={handleLogout}
-            isLoading={isLoggingOut}
-          >
-            Sign out
-          </Button>
-        </div>
-      </header>
+      <CompanyNavbar companyName={companyDisplayName} logoUrl={profile?.logoUrl} />
 
       {/* Main Content */}
-      <main style={{ maxWidth: '840px', margin: '2.5rem auto', padding: '0 1.5rem' }}>
+      <main style={{ maxWidth: '880px', margin: '2.5rem auto', padding: '0 1.5rem' }}>
         {/* Welcome Banner */}
         <div
           style={{
@@ -164,21 +103,28 @@ export const CompanyDashboard: React.FC = () => {
             </div>
           </div>
 
-          <span
-            style={{
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: 'var(--color-success)',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              padding: '0.35rem 0.75rem',
-              borderRadius: 'var(--radius-full)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-            }}
-          >
-            ✓ Profile Active
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Link to="/company/profile" style={{ textDecoration: 'none' }}>
+              <Button variant="outline" size="sm">
+                View Profile
+              </Button>
+            </Link>
+            <span
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--color-success)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                padding: '0.35rem 0.75rem',
+                borderRadius: 'var(--radius-full)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
+            >
+              ✓ Active
+            </span>
+          </div>
         </div>
 
         {/* Company Profile Summary Card */}
@@ -191,9 +137,14 @@ export const CompanyDashboard: React.FC = () => {
             boxShadow: 'var(--shadow-sm)',
           }}
         >
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: '0 0 1rem' }}>
-            About {companyDisplayName}
-          </h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>
+              About {companyDisplayName}
+            </h2>
+            <Link to="/company/profile/edit" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+              Edit Profile →
+            </Link>
+          </div>
 
           <p style={{ fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--color-text-primary)', margin: '0 0 1.25rem' }}>
             {profile?.description || 'No description provided yet.'}
@@ -203,7 +154,7 @@ export const CompanyDashboard: React.FC = () => {
             {profile?.companySize && (
               <div>
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', display: 'block' }}>Size</span>
-                <strong>{profile.companySize}</strong>
+                <strong>{formatCompanySize(profile.companySize)}</strong>
               </div>
             )}
             {profile?.location && (
