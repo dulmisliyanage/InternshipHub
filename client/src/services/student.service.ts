@@ -40,6 +40,9 @@ export const studentService = {
       method: 'GET',
     });
   },
+  async getStudentProfile(): Promise<StudentProfileResponse> {
+    return this.getProfile();
+  },
 
   /**
    * Create or update the current student's profile + selected skills.
@@ -50,6 +53,9 @@ export const studentService = {
       body: JSON.stringify(payload),
     });
   },
+  async updateStudentProfile(payload: UpdateStudentProfilePayload): Promise<StudentProfileResponse> {
+    return this.updateProfile(payload);
+  },
 
   /**
    * Retrieve available skill categories and skills.
@@ -58,5 +64,8 @@ export const studentService = {
     return studentApiRequest<SkillsCatalogResponse>('/skills', {
       method: 'GET',
     });
+  },
+  async getSkillCatalog(): Promise<SkillsCatalogResponse> {
+    return this.getSkills();
   },
 };

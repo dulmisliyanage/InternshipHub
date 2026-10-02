@@ -23,6 +23,13 @@ export interface StudentSkill {
   proficiency: ProficiencyLevel;
 }
 
+export interface SelectedSkill {
+  skillId: string;
+  name: string;
+  category: string;
+  proficiency: ProficiencyLevel;
+}
+
 export interface StudentProfile {
   id: string;
   userId: string;
@@ -66,6 +73,8 @@ export interface UpdateStudentProfilePayload {
     proficiency: ProficiencyLevel;
   }[];
 }
+
+export type StudentProfilePayload = UpdateStudentProfilePayload;
 
 export interface StudentProfileResponse {
   status: 'success' | 'error';
