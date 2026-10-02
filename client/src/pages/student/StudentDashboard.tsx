@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { StudentNavbar } from '../../components/student/StudentNavbar';
+import { ProfileAvatar } from '../../components/student/profile/ProfileAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { studentService } from '../../services/student.service';
 import type { StudentProfile } from '../../types/student';
 
 export const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -42,18 +43,6 @@ export const StudentDashboard: React.FC = () => {
     };
   }, [navigate]);
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await logout();
-      navigate('/login', { replace: true });
-    } catch (err) {
-      console.error('Logout failed:', err);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
   if (isLoadingProfile) {
     return (
       <div
@@ -81,48 +70,7 @@ export const StudentDashboard: React.FC = () => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--color-background)', paddingBottom: '4rem' }}>
       {/* Top Navigation */}
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1rem 2rem',
-          backgroundColor: 'var(--color-surface)',
-          borderBottom: '1px solid var(--color-border)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <span className="logo" style={{ fontSize: '1.25rem', fontWeight: 800 }}>
-              Internship<span style={{ color: 'var(--color-primary)' }}>Hub</span>
-            </span>
-          </Link>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: 'var(--color-primary)',
-              backgroundColor: 'var(--color-primary-light)',
-              padding: '0.2rem 0.6rem',
-              borderRadius: 'var(--radius-full)',
-            }}
-          >
-            STUDENT DASHBOARD
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Button
-            id="student-logout-btn"
-            size="sm"
-            variant="ghost"
-            onClick={handleLogout}
-            isLoading={isLoggingOut}
-          >
-            Sign out
-          </Button>
-        </div>
-      </header>
+      <StudentNavbar userName={displayName} userAvatar={profile?.profileImage} />
 
       {/* Main Container */}
       <main style={{ maxWidth: '900px', margin: '2.5rem auto', padding: '0 1.5rem' }}>
@@ -143,22 +91,7 @@ export const StudentDashboard: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-            <div
-              style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--color-primary-light)',
-                color: 'var(--color-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.75rem',
-                fontWeight: 700,
-              }}
-            >
-              🎓
-            </div>
+            <ProfileAvatar src={profile?.profileImage} name={displayName} size={64} />
             <div>
               <h1 className="page-heading" style={{ fontSize: '1.5rem', margin: 0 }}>
                 Welcome back, {displayName}
@@ -170,7 +103,7 @@ export const StudentDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span
               style={{
                 fontSize: '0.8rem',
@@ -179,13 +112,19 @@ export const StudentDashboard: React.FC = () => {
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
                 padding: '0.35rem 0.75rem',
                 borderRadius: 'var(--radius-full)',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.25rem',
               }}
             >
               ✓ Profile Complete
             </span>
+
+            <Link to="/student/profile" style={{ textDecoration: 'none' }}>
+              <Button size="sm" variant="outline">
+                View Profile
+              </Button>
+            </Link>
           </div>
         </div>
 

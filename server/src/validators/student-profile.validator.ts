@@ -115,6 +115,7 @@ export const updateStudentProfileSchema = z
       .nullable()
       .optional()
       .or(z.literal('').transform(() => null)),
+    profileImage: optionalUrl,
     bio: z
       .string()
       .trim()

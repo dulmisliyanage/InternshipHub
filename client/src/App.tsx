@@ -11,6 +11,8 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ChooseAccountTypePage } from './pages/auth/ChooseAccountTypePage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { StudentOnboardingPage } from './pages/student/StudentOnboardingPage';
+import { StudentProfilePage } from './pages/student/StudentProfilePage';
+import { StudentProfileEditPage } from './pages/student/StudentProfileEditPage';
 import { CompanyDashboard } from './pages/company/CompanyDashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 
@@ -29,6 +31,8 @@ export const App: React.FC = () => {
           <Route element={<ProtectedRoute allowedRoles={['STUDENT']} />}>
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/onboarding" element={<StudentOnboardingPage />} />
+            <Route path="/student/profile" element={<StudentProfilePage />} />
+            <Route path="/student/profile/edit" element={<StudentProfileEditPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={['COMPANY']} />}>

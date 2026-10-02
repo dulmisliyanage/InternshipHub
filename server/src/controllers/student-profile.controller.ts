@@ -196,6 +196,14 @@ export async function updateStudentProfile(
           },
         });
 
+        // Update User.profileImage if provided
+        if (data.profileImage !== undefined) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { profileImage: data.profileImage },
+          });
+        }
+
         // Transactionally replace skills if provided
         if (data.skills !== undefined) {
           await tx.studentSkill.deleteMany({

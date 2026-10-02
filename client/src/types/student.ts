@@ -55,6 +55,7 @@ export interface StudentProfile {
 }
 
 export interface UpdateStudentProfilePayload {
+  profileImage?: string | null;
   university?: string | null;
   degree?: string | null;
   fieldOfStudy?: string | null;
