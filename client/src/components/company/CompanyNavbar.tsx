@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Building2, LogOut, Briefcase } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CompanyLogo } from './CompanyLogo';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +34,7 @@ export const CompanyNavbar: React.FC<CompanyNavbarProps> = ({
   };
 
   const isDashboard = location.pathname === '/company/dashboard';
+  const isInternships = location.pathname.startsWith('/company/internships');
   const isProfile = location.pathname.startsWith('/company/profile');
 
   return (
@@ -101,6 +102,26 @@ export const CompanyNavbar: React.FC<CompanyNavbarProps> = ({
           >
             <LayoutDashboard size={16} />
             <span>Dashboard</span>
+          </Link>
+
+          <Link
+            to="/company/internships"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              textDecoration: 'none',
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-lg)',
+              fontSize: '0.875rem',
+              fontWeight: isInternships ? 700 : 500,
+              color: isInternships ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              backgroundColor: isInternships ? 'var(--color-primary-light)' : 'transparent',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Briefcase size={16} />
+            <span>Internships</span>
           </Link>
 
           <Link
