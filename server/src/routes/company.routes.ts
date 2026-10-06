@@ -7,6 +7,15 @@ import {
   uploadCompanyLogo,
   deleteCompanyLogo,
 } from '../controllers/company-profile.controller';
+import {
+  createInternship,
+  getCompanyInternships,
+  getCompanyInternshipById,
+  updateCompanyInternship,
+  publishCompanyInternship,
+  closeCompanyInternship,
+  archiveCompanyInternship,
+} from '../controllers/internship.controller';
 
 const router = Router();
 
@@ -20,6 +29,15 @@ router.put('/profile', updateCompanyProfile);
 // Company Logo Management
 router.put('/profile/logo', uploadCompanyLogoMiddleware, uploadCompanyLogo);
 router.delete('/profile/logo', deleteCompanyLogo);
+
+// Internship Management (Phase 4)
+router.post('/internships', createInternship);
+router.get('/internships', getCompanyInternships);
+router.get('/internships/:id', getCompanyInternshipById);
+router.put('/internships/:id', updateCompanyInternship);
+router.post('/internships/:id/publish', publishCompanyInternship);
+router.post('/internships/:id/close', closeCompanyInternship);
+router.post('/internships/:id/archive', archiveCompanyInternship);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
