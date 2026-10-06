@@ -53,3 +53,42 @@ export interface InternshipSingleResponse {
   internship: Internship;
   message?: string;
 }
+
+export interface SkillCatalogItem {
+  id: string;
+  name: string;
+}
+
+export interface SkillCategoryCatalogItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  skills: SkillCatalogItem[];
+}
+
+export interface SkillsCatalogResponse {
+  status: 'success' | 'error';
+  categories: SkillCategoryCatalogItem[];
+  message?: string;
+}
+
+export interface CreateInternshipSkillItem {
+  skillId: string;
+  type: InternshipSkillType;
+}
+
+export interface CreateInternshipPayload {
+  title: string;
+  category?: string | null;
+  description: string;
+  responsibilities?: string | null;
+  location?: string | null;
+  workType: WorkType;
+  duration?: string | null;
+  allowanceMin?: number | null;
+  allowanceMax?: number | null;
+  currency?: string | null;
+  positions?: number;
+  applicationDeadline?: string | null;
+  skills?: CreateInternshipSkillItem[];
+}

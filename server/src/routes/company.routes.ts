@@ -16,11 +16,15 @@ import {
   closeCompanyInternship,
   archiveCompanyInternship,
 } from '../controllers/internship.controller';
+import { getSkillsCatalog } from '../controllers/student-profile.controller';
 
 const router = Router();
 
 // Apply authenticate and requireRole('COMPANY') to all /api/company routes
 router.use(authenticate, requireRole('COMPANY'));
+
+// Standardized Skill Catalog
+router.get('/skills', getSkillsCatalog);
 
 // Company Profile Management
 router.get('/profile', getCompanyProfile);
