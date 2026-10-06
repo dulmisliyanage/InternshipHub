@@ -38,6 +38,18 @@ enum CompanySize {
   ENTERPRISE
 }
 
+enum InternshipStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum InternshipSkillType {
+  REQUIRED
+  PREFERRED
+}
+
 enum ProficiencyLevel {
   BEGINNER
   INTERMEDIATE
@@ -105,10 +117,58 @@ model CompanyProfile {
 
   description String?
 
+  internships Internship[]
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Internship {
+  id                  String           @id @default(cuid())
+  companyProfileId    String
+  title               String
+  category            String?
+  description         String
+  responsibilities    String?
+  location            String?
+  workType            WorkType
+  duration            String?
+  allowanceMin        Int?
+  allowanceMax        Int?
+  currency            String?          @default("LKR")
+  positions           Int              @default(1)
+  applicationDeadline DateTime?
+  status              InternshipStatus @default(DRAFT)
+  publishedAt         DateTime?
+  closedAt            DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  companyProfile CompanyProfile    @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  skills         InternshipSkill[]
+
+  @@index([companyProfileId])
+  @@index([status])
+  @@index([workType])
+  @@index([applicationDeadline])
+}
+
+model InternshipSkill {
+  id           String              @id @default(cuid())
+  internshipId String
+  skillId      String
+  type         InternshipSkillType @default(REQUIRED)
+  createdAt    DateTime            @default(now())
+
+  internship Internship @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([internshipId, skillId])
+  @@index([internshipId])
+  @@index([skillId])
+  @@index([type])
 }
 
 model SkillCategory {
@@ -129,7 +189,8 @@ model Skill {
 
   category SkillCategory @relation(fields: [categoryId], references: [id])
 
-  studentSkills StudentSkill[]
+  studentSkills    StudentSkill[]
+  internshipSkills InternshipSkill[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
