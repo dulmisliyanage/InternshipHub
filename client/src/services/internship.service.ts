@@ -81,4 +81,31 @@ export const internshipService = {
       method: 'GET',
     });
   },
+
+  /**
+   * Publish a DRAFT internship listing.
+   */
+  async publishCompanyInternship(id: string): Promise<InternshipSingleResponse> {
+    return companyApiRequest<InternshipSingleResponse>(`/internships/${id}/publish`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Close a PUBLISHED internship listing.
+   */
+  async closeCompanyInternship(id: string): Promise<InternshipSingleResponse> {
+    return companyApiRequest<InternshipSingleResponse>(`/internships/${id}/close`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Archive a DRAFT or CLOSED internship listing.
+   */
+  async archiveCompanyInternship(id: string): Promise<InternshipSingleResponse> {
+    return companyApiRequest<InternshipSingleResponse>(`/internships/${id}/archive`, {
+      method: 'POST',
+    });
+  },
 };
