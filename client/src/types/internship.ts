@@ -92,3 +92,6 @@ export interface CreateInternshipPayload {
   applicationDeadline?: string | null;
   skills?: CreateInternshipSkillItem[];
 }
+
+export type UpdateInternshipPayload = CreateInternshipPayload;
+

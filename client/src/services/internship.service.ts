@@ -61,6 +61,19 @@ export const internshipService = {
   },
 
   /**
+   * Update an existing internship listing.
+   */
+  async updateCompanyInternship(
+    id: string,
+    payload: CreateInternshipPayload
+  ): Promise<InternshipSingleResponse> {
+    return companyApiRequest<InternshipSingleResponse>(`/internships/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
    * Fetch the standardized skill catalog (categories & skills).
    */
   async getSkillsCatalog(): Promise<SkillsCatalogResponse> {
