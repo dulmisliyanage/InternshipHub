@@ -221,8 +221,15 @@ export async function getCompanyInternships(
   }
 
   try {
+    const statusQuery = typeof req.query.status === 'string' ? req.query.status.trim().toUpperCase() : undefined;
+    const whereClause: any = { companyProfileId: companyProfile.id };
+
+    if (statusQuery && ['DRAFT', 'PUBLISHED', 'CLOSED', 'ARCHIVED'].includes(statusQuery)) {
+      whereClause.status = statusQuery;
+    }
+
     const internships = await prisma.internship.findMany({
-      where: { companyProfileId: companyProfile.id },
+      where: whereClause,
       orderBy: { updatedAt: 'desc' },
       include: internshipInclude,
     });
