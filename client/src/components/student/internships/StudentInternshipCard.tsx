@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   MapPin,
   Clock,
@@ -11,78 +11,18 @@ import {
 } from 'lucide-react';
 import { CompanyLogo } from '../../company/CompanyLogo';
 import type { DiscoveryInternshipItem } from '../../../types/internshipDiscovery';
+import {
+  formatDeadlineDate,
+  formatAllowance,
+  getWorkTypeBadge,
+} from '../../../utils/internshipFormatters';
 
 interface StudentInternshipCardProps {
   internship: DiscoveryInternshipItem;
 }
 
-const formatDeadlineDate = (dateStr?: string | null): string => {
-  if (!dateStr) return 'No deadline specified';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'Invalid date';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(d);
-};
-
-const formatAllowance = (
-  min?: number | null,
-  max?: number | null,
-  currency: string = 'LKR'
-): string => {
-  const curr = currency || 'LKR';
-  if (min == null && max == null) return 'Allowance not specified';
-  if (min != null && max != null && min === max) {
-    return `${curr} ${min.toLocaleString()}/mo`;
-  }
-  if (min != null && max != null) {
-    return `${curr} ${min.toLocaleString()} – ${max.toLocaleString()}/mo`;
-  }
-  if (min != null) {
-    return `From ${curr} ${min.toLocaleString()}/mo`;
-  }
-  if (max != null) {
-    return `Up to ${curr} ${max.toLocaleString()}/mo`;
-  }
-  return 'Allowance not specified';
-};
-
-const getWorkTypeBadge = (workType: string) => {
-  switch (workType) {
-    case 'REMOTE':
-      return {
-        label: 'Remote',
-        bg: '#EEF2FF',
-        color: '#4338CA',
-        border: '#C7D2FE',
-      };
-    case 'HYBRID':
-      return {
-        label: 'Hybrid',
-        bg: '#F0FDF4',
-        color: '#15803D',
-        border: '#BBF7D0',
-      };
-    case 'ONSITE':
-      return {
-        label: 'On-site',
-        bg: '#FFF7ED',
-        color: '#C2410C',
-        border: '#FFEDD5',
-      };
-    default:
-      return {
-        label: workType,
-        bg: '#F1F5F9',
-        color: '#475569',
-        border: '#E2E8F0',
-      };
-  }
-};
-
 export const StudentInternshipCard: React.FC<StudentInternshipCardProps> = ({ internship }) => {
+  const location = useLocation();
   const companyName = internship.company?.companyName || 'Verified Company';
   const locationText = internship.location || internship.company?.location || 'Sri Lanka';
   const workTypeConfig = getWorkTypeBadge(internship.workType);
@@ -336,6 +276,7 @@ export const StudentInternshipCard: React.FC<StudentInternshipCardProps> = ({ in
       >
         <Link
           to={`/student/internships/${internship.id}`}
+          state={{ from: location.pathname + location.search }}
           id={`view-details-${internship.id}`}
           style={{
             display: 'inline-flex',
