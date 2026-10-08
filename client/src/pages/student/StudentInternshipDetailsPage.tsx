@@ -13,12 +13,14 @@ import { Button } from '../../components/ui/Button';
 import { CompanyLogo } from '../../components/company/CompanyLogo';
 import { InternshipOverview } from '../../components/student/internships/InternshipOverview';
 import { InternshipSkillsSection } from '../../components/student/internships/InternshipSkillsSection';
+import { InternshipSkillComparison } from '../../components/student/internships/InternshipSkillComparison';
 import { InternshipCompanySection } from '../../components/student/internships/InternshipCompanySection';
 import { internshipDiscoveryService } from '../../services/internshipDiscovery.service';
 import { studentService } from '../../services/student.service';
 import { useAuth } from '../../context/AuthContext';
 import { getWorkTypeBadge } from '../../utils/internshipFormatters';
 import type { DiscoveryInternshipItem } from '../../types/internshipDiscovery';
+import type { StudentSkill } from '../../types/student';
 
 export const StudentInternshipDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +33,11 @@ export const StudentInternshipDetailsPage: React.FC = () => {
   const [isNotFound, setIsNotFound] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Student profile skills state for skill requirement comparison
+  const [studentSkills, setStudentSkills] = useState<StudentSkill[] | null>(null);
+  const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(true);
+  const [skillsError, setSkillsError] = useState<string | null>(null);
+
   // Validate and determine safe return URL from navigation state
   const rawFrom = (location.state as any)?.from;
   const returnUrl =
@@ -38,24 +45,32 @@ export const StudentInternshipDetailsPage: React.FC = () => {
       ? rawFrom
       : '/student/internships';
 
-  // Fetch optional profile avatar for student navbar
-  useEffect(() => {
-    let isMounted = true;
-    studentService
-      .getProfile()
-      .then((res) => {
-        if (isMounted && res.profile?.profileImage) {
+  // Fetch student profile skills (and optional avatar) for skill compatibility comparison
+  const fetchStudentSkills = useCallback(async () => {
+    setIsLoadingSkills(true);
+    setSkillsError(null);
+
+    try {
+      const res = await studentService.getProfile();
+      if (res.status === 'success') {
+        setStudentSkills(res.profile?.skills || []);
+        if (res.profile?.profileImage) {
           setProfileAvatar(res.profile.profileImage);
         }
-      })
-      .catch(() => {
-        // Non-blocking fallback
-      });
-
-    return () => {
-      isMounted = false;
-    };
+      } else {
+        throw new Error(res.message || 'Failed to load profile');
+      }
+    } catch (err: any) {
+      console.error('Error loading student profile skills:', err);
+      setSkillsError(err.message || 'Unable to load profile skills. Please try again.');
+    } finally {
+      setIsLoadingSkills(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStudentSkills();
+  }, [fetchStudentSkills]);
 
   // Fetch internship details by ID
   const fetchDetails = useCallback(async () => {
@@ -509,10 +524,19 @@ export const StudentInternshipDetailsPage: React.FC = () => {
               </section>
             )}
 
-            {/* 4. Skills Requirements Section */}
+            {/* 4. Skills Requirements Section (Employer Requirements) */}
             <InternshipSkillsSection skills={internship.skills || []} />
 
-            {/* 5. Company Overview & Safe Links Section */}
+            {/* 5. Your Skill Compatibility Preview (Student Profile Match) */}
+            <InternshipSkillComparison
+              internshipSkills={internship.skills || []}
+              studentSkills={studentSkills}
+              isLoading={isLoadingSkills}
+              error={skillsError}
+              onRetry={fetchStudentSkills}
+            />
+
+            {/* 6. Company Overview & Safe Links Section */}
             <InternshipCompanySection company={internship.company} />
           </>
         ) : null}
