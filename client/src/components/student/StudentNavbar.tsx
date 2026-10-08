@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, User as UserIcon, LogOut } from 'lucide-react';
+import { LayoutDashboard, User as UserIcon, LogOut, Briefcase } from 'lucide-react';
 import { Button } from '../ui';
 import { ProfileAvatar } from './profile/ProfileAvatar';
 import { useAuth } from '../../context/AuthContext';
@@ -35,6 +35,7 @@ export const StudentNavbar: React.FC<StudentNavbarProps> = ({
   };
 
   const isDashboard = location.pathname === '/student/dashboard';
+  const isInternships = location.pathname.startsWith('/student/internships');
   const isProfile = location.pathname.startsWith('/student/profile');
 
   return (
@@ -72,6 +73,7 @@ export const StudentNavbar: React.FC<StudentNavbarProps> = ({
         <nav style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Link
             to="/student/dashboard"
+            id="nav-student-dashboard"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -88,6 +90,27 @@ export const StudentNavbar: React.FC<StudentNavbarProps> = ({
           >
             <LayoutDashboard size={16} />
             <span>Dashboard</span>
+          </Link>
+
+          <Link
+            to="/student/internships"
+            id="nav-student-internships"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              textDecoration: 'none',
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-lg)',
+              fontSize: '0.875rem',
+              fontWeight: isInternships ? 700 : 500,
+              color: isInternships ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              backgroundColor: isInternships ? 'var(--color-primary-light)' : 'transparent',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Briefcase size={16} />
+            <span>Discover Internships</span>
           </Link>
 
           <Link
