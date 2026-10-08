@@ -38,7 +38,8 @@ export const internshipDiscoveryService = {
    * Fetch paginated list of published and unexpired internships for student discovery.
    */
   async getPublishedInternships(
-    params?: DiscoveryQueryParams
+    params?: DiscoveryQueryParams,
+    options?: { signal?: AbortSignal }
   ): Promise<DiscoveryListResponse> {
     const query = new URLSearchParams();
     if (params?.page !== undefined) query.set('page', String(params.page));
@@ -53,6 +54,7 @@ export const internshipDiscoveryService = {
 
     return studentDiscoveryApiRequest<DiscoveryListResponse>(endpoint, {
       method: 'GET',
+      signal: options?.signal,
     });
   },
 

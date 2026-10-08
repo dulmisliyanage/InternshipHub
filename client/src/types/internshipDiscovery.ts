@@ -72,3 +72,27 @@ export interface DiscoveryQueryParams {
   category?: string;
   location?: string;
 }
+
+export const DISCOVERY_CATEGORIES = [
+  'Software Engineering',
+  'Frontend Development',
+  'Backend Development',
+  'Full Stack Development',
+  'UI/UX Design',
+  'Design',
+  'Data Science & Analytics',
+  'Mobile App Development',
+  'DevOps & Cloud',
+  'Quality Assurance & Testing',
+  'Cybersecurity',
+  'Product Management',
+  'Business Analysis',
+] as const;
+
+export const WORK_TYPE_OPTIONS = [
+  { value: '', label: 'All Work Types' },
+  { value: 'REMOTE', label: 'Remote' },
+  { value: 'HYBRID', label: 'Hybrid' },
+  { value: 'ONSITE', label: 'On-site' },
+] as const;
+

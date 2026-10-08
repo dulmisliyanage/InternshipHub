@@ -16,7 +16,7 @@ interface StudentInternshipCardProps {
   internship: DiscoveryInternshipItem;
 }
 
-export const formatDeadlineDate = (dateStr?: string | null): string => {
+const formatDeadlineDate = (dateStr?: string | null): string => {
   if (!dateStr) return 'No deadline specified';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return 'Invalid date';
@@ -27,7 +27,7 @@ export const formatDeadlineDate = (dateStr?: string | null): string => {
   }).format(d);
 };
 
-export const formatAllowance = (
+const formatAllowance = (
   min?: number | null,
   max?: number | null,
   currency: string = 'LKR'

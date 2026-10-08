@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Briefcase,
   ChevronLeft,
@@ -6,7 +7,8 @@ import {
   RefreshCw,
   AlertCircle,
   Inbox,
-  Sparkles,
+  SearchX,
+  RotateCcw,
 } from 'lucide-react';
 import { StudentNavbar } from '../../components/student/StudentNavbar';
 import { Button } from '../../components/ui/Button';
@@ -14,6 +16,8 @@ import {
   StudentInternshipCard,
   StudentInternshipCardSkeleton,
 } from '../../components/student/internships/StudentInternshipCard';
+import { InternshipFilters } from '../../components/student/internships/InternshipFilters';
+import type { FilterValues } from '../../components/student/internships/InternshipFilters';
 import { internshipDiscoveryService } from '../../services/internshipDiscovery.service';
 import { studentService } from '../../services/student.service';
 import { useAuth } from '../../context/AuthContext';
@@ -23,18 +27,48 @@ import type {
 } from '../../types/internshipDiscovery';
 
 const ITEMS_PER_PAGE = 10;
+const DEBOUNCE_MS = 350;
 
 export const StudentInternshipsPage: React.FC = () => {
   const { user } = useAuth();
   const [profileAvatar, setProfileAvatar] = useState<string | null>(null);
 
+  // URL Search Parameters are the canonical source of applied filter state
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Parse active filters from URL
+  const urlSearch = searchParams.get('search') || '';
+  const urlWorkType = searchParams.get('workType') || '';
+  const urlCategory = searchParams.get('category') || '';
+  const urlLocation = searchParams.get('location') || '';
+  const parsedPage = parseInt(searchParams.get('page') || '1', 10);
+  const currentPage = isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+
+  // Local state for debounced text inputs (search and location)
+  const [inputSearch, setInputSearch] = useState<string>(urlSearch);
+  const [prevUrlSearch, setPrevUrlSearch] = useState<string>(urlSearch);
+  if (urlSearch !== prevUrlSearch) {
+    setPrevUrlSearch(urlSearch);
+    setInputSearch(urlSearch);
+  }
+
+  const [inputLocation, setInputLocation] = useState<string>(urlLocation);
+  const [prevUrlLocation, setPrevUrlLocation] = useState<string>(urlLocation);
+  if (urlLocation !== prevUrlLocation) {
+    setPrevUrlLocation(urlLocation);
+    setInputLocation(urlLocation);
+  }
+
   const [internships, setInternships] = useState<DiscoveryInternshipItem[]>([]);
   const [pagination, setPagination] = useState<DiscoveryPagination | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch optional profile avatar for student navbar
+  // Concurrent request tracking & AbortController ref
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
+
+  // Fetch optional student profile avatar for navbar
   useEffect(() => {
     let isMounted = true;
     studentService
@@ -45,7 +79,7 @@ export const StudentInternshipsPage: React.FC = () => {
         }
       })
       .catch(() => {
-        // Non-blocking fallback to user context avatar
+        // Non-blocking fallback
       });
 
     return () => {
@@ -53,48 +87,199 @@ export const StudentInternshipsPage: React.FC = () => {
     };
   }, []);
 
-  // Fetch published internships
-  const fetchInternships = useCallback(async (pageToLoad: number) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await internshipDiscoveryService.getPublishedInternships({
-        page: pageToLoad,
-        limit: ITEMS_PER_PAGE,
-      });
-
-      if (response.status === 'success') {
-        setInternships(response.internships || []);
-        setPagination(response.pagination);
-      } else {
-        throw new Error(response.message || 'Failed to retrieve published internships');
+  // Fetch published internships with active filters and AbortController protection
+  const fetchInternships = useCallback(
+    async (
+      page: number,
+      search: string,
+      workType: string,
+      category: string,
+      location: string
+    ) => {
+      // Abort previous in-flight request if any
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    } catch (err: any) {
-      console.error('Error loading internships:', err);
-      setError(err.message || 'Unable to load internships. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      const currentRequestId = ++requestIdRef.current;
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await internshipDiscoveryService.getPublishedInternships(
+          {
+            page,
+            limit: ITEMS_PER_PAGE,
+            search: search.trim() ? search.trim() : undefined,
+            workType: (workType as any) || undefined,
+            category: category.trim() ? category.trim() : undefined,
+            location: location.trim() ? location.trim() : undefined,
+          },
+          { signal: controller.signal }
+        );
+
+        // Stale response check
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        if (response.status === 'success') {
+          setInternships(response.internships || []);
+          setPagination(response.pagination);
+        } else {
+          throw new Error(response.message || 'Failed to retrieve published internships');
+        }
+      } catch (err: any) {
+        // Silently ignore aborted requests
+        if (err.name === 'AbortError' || controller.signal.aborted) {
+          return;
+        }
+
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        console.error('Error loading internships:', err);
+        setError(err.message || 'Unable to load internships. Please check your connection and try again.');
+      } finally {
+        if (currentRequestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  // Trigger fetch whenever canonical URL parameters change
   useEffect(() => {
-    fetchInternships(currentPage);
-  }, [fetchInternships, currentPage]);
+    fetchInternships(currentPage, urlSearch, urlWorkType, urlCategory, urlLocation);
+  }, [fetchInternships, currentPage, urlSearch, urlWorkType, urlCategory, urlLocation]);
 
+  // Debounced update for search keyword
+  useEffect(() => {
+    if (inputSearch === urlSearch) return;
+
+    const timer = setTimeout(() => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const trimmed = inputSearch.trim();
+          if (trimmed) {
+            next.set('search', trimmed);
+          } else {
+            next.delete('search');
+          }
+          next.set('page', '1'); // Reset to page 1 on search change
+          return next;
+        },
+        { replace: true }
+      );
+    }, DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [inputSearch, urlSearch, setSearchParams]);
+
+  // Debounced update for location
+  useEffect(() => {
+    if (inputLocation === urlLocation) return;
+
+    const timer = setTimeout(() => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const trimmed = inputLocation.trim();
+          if (trimmed) {
+            next.set('location', trimmed);
+          } else {
+            next.delete('location');
+          }
+          next.set('page', '1'); // Reset to page 1 on location change
+          return next;
+        },
+        { replace: true }
+      );
+    }, DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [inputLocation, urlLocation, setSearchParams]);
+
+  // Handler for immediate changes (workType, category) or typing changes
+  const handleFilterChange = (field: keyof FilterValues, value: string) => {
+    if (field === 'search') {
+      setInputSearch(value);
+    } else if (field === 'location') {
+      setInputLocation(value);
+    } else if (field === 'workType') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) {
+            next.set('workType', value);
+          } else {
+            next.delete('workType');
+          }
+          next.set('page', '1');
+          return next;
+        },
+        { replace: false }
+      );
+    } else if (field === 'category') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) {
+            next.set('category', value);
+          } else {
+            next.delete('category');
+          }
+          next.set('page', '1');
+          return next;
+        },
+        { replace: false }
+      );
+    }
+  };
+
+  // Reset all filters and return to page 1
+  const handleClearFilters = () => {
+    setInputSearch('');
+    setInputLocation('');
+    setSearchParams({}, { replace: true });
+  };
+
+  // Pagination page change handlers
   const handlePrevPage = () => {
     if (pagination?.hasPrevPage && currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('page', String(currentPage - 1));
+          return next;
+        },
+        { replace: false }
+      );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handleNextPage = () => {
     if (pagination?.hasNextPage) {
-      setCurrentPage((prev) => prev + 1);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('page', String(currentPage + 1));
+          return next;
+        },
+        { replace: false }
+      );
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  const hasActiveFilters = Boolean(urlSearch || urlWorkType || urlCategory || urlLocation);
 
   const totalItems = pagination?.total ?? 0;
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
@@ -114,7 +299,7 @@ export const StudentInternshipsPage: React.FC = () => {
             borderRadius: 'var(--radius-xl)',
             padding: '2rem',
             boxShadow: 'var(--shadow-sm)',
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -163,39 +348,17 @@ export const StudentInternshipsPage: React.FC = () => {
                 lineHeight: 1.5,
               }}
             >
-              Explore verified opportunities from top companies and kickstart your professional journey.
+              Find opportunities that match your interests, skills, and preferred work arrangements.
             </p>
           </div>
 
-          {/* Quick Counter / Refresh CTA */}
+          {/* Quick Refresh CTA */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            {pagination && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  color: 'var(--color-text-secondary)',
-                  backgroundColor: 'rgba(241, 245, 249, 0.7)',
-                  padding: '0.5rem 0.85rem',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <Sparkles size={15} style={{ color: 'var(--color-primary)' }} />
-                <span>
-                  {pagination.total} {pagination.total === 1 ? 'Opportunity' : 'Opportunities'}
-                </span>
-              </div>
-            )}
-
             <Button
               id="refresh-internships-btn"
               variant="outline"
               size="sm"
-              onClick={() => fetchInternships(currentPage)}
+              onClick={() => fetchInternships(currentPage, urlSearch, urlWorkType, urlCategory, urlLocation)}
               disabled={isLoading}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               title="Refresh listings"
@@ -205,6 +368,21 @@ export const StudentInternshipsPage: React.FC = () => {
             </Button>
           </div>
         </section>
+
+        {/* Interactive Search & Filter Controls */}
+        <InternshipFilters
+          values={{
+            search: inputSearch,
+            workType: urlWorkType,
+            category: urlCategory,
+            location: inputLocation,
+          }}
+          onChange={handleFilterChange}
+          onClear={handleClearFilters}
+          hasActiveFilters={hasActiveFilters}
+          totalResults={pagination?.total}
+          isLoading={isLoading}
+        />
 
         {/* Content Section: Loading, Error, Empty, or Loaded Cards */}
         {isLoading ? (
@@ -281,68 +459,137 @@ export const StudentInternshipsPage: React.FC = () => {
               id="retry-fetch-btn"
               variant="primary"
               size="md"
-              onClick={() => fetchInternships(currentPage)}
+              onClick={() => fetchInternships(currentPage, urlSearch, urlWorkType, urlCategory, urlLocation)}
               style={{ marginTop: '0.5rem' }}
             >
               Retry
             </Button>
           </section>
         ) : internships.length === 0 ? (
-          /* Empty State */
-          <section
-            id="internships-empty-state"
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              border: '1px dashed var(--color-border)',
-              borderRadius: 'var(--radius-xl)',
-              padding: '4rem 2rem',
-              textAlign: 'center',
-              boxShadow: 'var(--shadow-sm)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '1rem',
-            }}
-          >
-            <div
+          /* Distinct Empty States: Filter-specific vs Global empty */
+          hasActiveFilters ? (
+            /* Situation 2: No Matching Internships for active filters */
+            <section
+              id="internships-no-matches-state"
               style={{
-                width: 64,
-                height: 64,
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: 'rgba(241, 245, 249, 0.8)',
-                color: 'var(--color-text-secondary)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px dashed var(--color-border)',
+                borderRadius: 'var(--radius-xl)',
+                padding: '4rem 2rem',
+                textAlign: 'center',
+                boxShadow: 'var(--shadow-sm)',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: '1.25rem',
               }}
             >
-              <Inbox size={32} />
-            </div>
-            <div>
-              <h2
+              <div
                 style={{
-                  fontFamily: 'var(--font-heading)',
-                  fontSize: '1.3rem',
-                  fontWeight: 700,
-                  color: 'var(--color-text-primary)',
-                  margin: '0 0 0.5rem 0',
+                  width: 64,
+                  height: 64,
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(239, 246, 255, 0.9)',
+                  color: 'var(--color-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                No internships available yet
-              </h2>
-              <p
+                <SearchX size={32} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '1.3rem',
+                    fontWeight: 700,
+                    color: 'var(--color-text-primary)',
+                    margin: '0 0 0.5rem 0',
+                  }}
+                >
+                  No matching internships found
+                </h2>
+                <p
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.95rem',
+                    maxWidth: '460px',
+                    margin: '0 auto',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Try changing your search terms, selecting a different work arrangement, or clearing active filters.
+                </p>
+              </div>
+              <Button
+                id="empty-clear-filters-btn"
+                variant="outline"
+                size="md"
+                onClick={handleClearFilters}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <RotateCcw size={15} />
+                <span>Clear All Filters</span>
+              </Button>
+            </section>
+          ) : (
+            /* Situation 1: No Published Internships at all */
+            <section
+              id="internships-empty-state"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                border: '1px dashed var(--color-border)',
+                borderRadius: 'var(--radius-xl)',
+                padding: '4rem 2rem',
+                textAlign: 'center',
+                boxShadow: 'var(--shadow-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
+              <div
                 style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(241, 245, 249, 0.8)',
                   color: 'var(--color-text-secondary)',
-                  fontSize: '0.95rem',
-                  maxWidth: '460px',
-                  margin: '0 auto',
-                  lineHeight: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                Check back later for new opportunities. Companies frequently post new openings for talented students.
-              </p>
-            </div>
-          </section>
+                <Inbox size={32} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '1.3rem',
+                    fontWeight: 700,
+                    color: 'var(--color-text-primary)',
+                    margin: '0 0 0.5rem 0',
+                  }}
+                >
+                  No internship opportunities available yet
+                </h2>
+                <p
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.95rem',
+                    maxWidth: '460px',
+                    margin: '0 auto',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Check back later for new opportunities. Companies frequently post new openings for talented students.
+                </p>
+              </div>
+            </section>
+          )
         ) : (
           /* Loaded List & Pagination */
           <>
