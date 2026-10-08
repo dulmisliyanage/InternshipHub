@@ -8,6 +8,10 @@ import {
   uploadProfileImage,
   deleteProfileImage,
 } from '../controllers/student-profile.controller';
+import {
+  getPublishedInternships,
+  getPublishedInternshipById,
+} from '../controllers/studentInternship.controller';
 
 const router = Router();
 
@@ -22,6 +26,10 @@ router.get('/skills', getSkillsCatalog);
 // Profile Picture Management
 router.put('/profile/image', uploadProfilePicture, uploadProfileImage);
 router.delete('/profile/image', deleteProfileImage);
+
+// Internship Discovery (Step 5.1) - Read-only published internship discovery
+router.get('/internships', getPublishedInternships);
+router.get('/internships/:id', getPublishedInternshipById);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
