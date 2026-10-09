@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -45,6 +46,16 @@ enum InternshipStatus {
   ARCHIVED
 }
 
+enum ApplicationStatus {
+  APPLIED
+  UNDER_REVIEW
+  SHORTLISTED
+  INTERVIEW
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
 enum InternshipSkillType {
   REQUIRED
   PREFERRED
@@ -67,8 +78,9 @@ model User {
   status       AccountStatus @default(ACTIVE)
   profileImage String?
 
-  studentProfile StudentProfile?
-  companyProfile CompanyProfile?
+  studentProfile             StudentProfile?
+  companyProfile             CompanyProfile?
+  applicationStatusHistories ApplicationStatusHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,7 +106,8 @@ model StudentProfile {
   portfolioUrl String?
   cvUrl        String?
 
-  skills StudentSkill[]
+  skills       StudentSkill[]
+  applications Application[]
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -148,6 +161,7 @@ model Internship {
 
   companyProfile CompanyProfile    @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
   skills         InternshipSkill[]
+  applications   Application[]
 
   @@index([companyProfileId])
   @@index([status])
@@ -169,6 +183,45 @@ model InternshipSkill {
   @@index([internshipId])
   @@index([skillId])
   @@index([type])
+}
+
+model Application {
+  id               String @id @default(cuid())
+  studentProfileId String
+  internshipId     String
+
+  coverLetter String?           @db.Text
+  cvUrl       String?
+  status      ApplicationStatus @default(APPLIED)
+
+  appliedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  internship     Internship     @relation(fields: [internshipId], references: [id], onDelete: Cascade)
+
+  statusHistory ApplicationStatusHistory[]
+
+  @@unique([studentProfileId, internshipId])
+  @@index([studentProfileId, status])
+  @@index([internshipId, status])
+  @@index([status])
+}
+
+model ApplicationStatusHistory {
+  id            String             @id @default(cuid())
+  applicationId String
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedById   String
+  note          String?            @db.Text
+  changedAt     DateTime           @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy   User        @relation(fields: [changedById], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, changedAt])
+  @@index([changedById])
 }
 
 model SkillCategory {
