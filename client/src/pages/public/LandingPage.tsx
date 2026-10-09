@@ -1,8 +1,32 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
+import { useAuth } from '../../context/AuthContext';
+import { getDashboardPath } from '../../utils/navigation';
 
 export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+
+  const handleFindInternships = () => {
+    // 1. Unauthenticated visitors: navigate to student login, preserving discovery destination
+    if (!isAuthenticated || !user) {
+      navigate('/login', {
+        state: { from: { pathname: '/student/internships' } },
+      });
+      return;
+    }
+
+    // 2. Authenticated STUDENT: navigate directly to discovery
+    if (user.role === 'STUDENT') {
+      navigate('/student/internships');
+      return;
+    }
+
+    // 3. Authenticated COMPANY or ADMIN: redirect to their role-appropriate dashboard
+    navigate(getDashboardPath(user.role));
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Navigation Header */}
@@ -40,14 +64,24 @@ export const LandingPage: React.FC = () => {
         </Link>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/login" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Log in
-          </Link>
-          <Link to="/register">
-            <Button size="sm" variant="primary">
-              Sign up
-            </Button>
-          </Link>
+          {isAuthenticated && user ? (
+            <Link to={getDashboardPath(user.role)}>
+              <Button size="sm" variant="primary">
+                Dashboard
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Link to="/login" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                Log in
+              </Link>
+              <Link to="/register">
+                <Button size="sm" variant="primary">
+                  Sign up
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -106,7 +140,12 @@ export const LandingPage: React.FC = () => {
         </p>
 
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Button size="lg" variant="primary" onClick={() => alert('Search internships coming soon')}>
+          <Button
+            size="lg"
+            variant="primary"
+            id="find-internships-btn"
+            onClick={handleFindInternships}
+          >
             Find Internships
           </Button>
           <Link to="/register">
@@ -138,6 +177,8 @@ export const LandingPage: React.FC = () => {
             <Link to="/choose-account-type" style={{ fontSize: '0.875rem' }}>/choose-account-type</Link>
             <span>•</span>
             <Link to="/student/dashboard" style={{ fontSize: '0.875rem' }}>/student/dashboard</Link>
+            <span>•</span>
+            <Link to="/student/internships" style={{ fontSize: '0.875rem' }}>/student/internships</Link>
             <span>•</span>
             <Link to="/company/dashboard" style={{ fontSize: '0.875rem' }}>/company/dashboard</Link>
             <span>•</span>

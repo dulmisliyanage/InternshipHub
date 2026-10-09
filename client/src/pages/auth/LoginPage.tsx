@@ -24,11 +24,31 @@ export const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailConflict, setEmailConflict] = useState(false);
 
-  // If already logged in, redirect straight to user's dashboard
+  // Helper to determine destination path preserving return URL while respecting role boundaries
+  const resolveDestination = (role: string) => {
+    const rawFrom = location.state?.from;
+    const fromPath = typeof rawFrom === 'string' ? rawFrom : rawFrom?.pathname;
+
+    if (fromPath && typeof fromPath === 'string') {
+      // Ensure student-only routes are not routed to company/admin
+      if (fromPath.startsWith('/student') && role !== 'STUDENT') {
+        return getDashboardPath(role as any);
+      }
+      if (fromPath.startsWith('/company') && role !== 'COMPANY') {
+        return getDashboardPath(role as any);
+      }
+      if (fromPath.startsWith('/admin') && role !== 'ADMIN') {
+        return getDashboardPath(role as any);
+      }
+      return fromPath;
+    }
+    return getDashboardPath(role as any);
+  };
+
+  // If already logged in, redirect straight to user's dashboard or preserved destination
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      const destination = location.state?.from?.pathname || getDashboardPath(user.role);
-      navigate(destination, { replace: true });
+      navigate(resolveDestination(user.role), { replace: true });
     }
   }, [isAuthenticated, user, isLoading, navigate, location]);
 
@@ -69,7 +89,7 @@ export const LoginPage: React.FC = () => {
         password,
       });
 
-      const targetPath = location.state?.from?.pathname || getDashboardPath(authenticatedUser.role);
+      const targetPath = resolveDestination(authenticatedUser.role);
       navigate(targetPath, { replace: true });
     } catch (err: unknown) {
       if (err instanceof ApiError) {
