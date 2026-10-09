@@ -44,3 +44,9 @@ prisma/*.db
 # Neon
 .neon
 
+# Private Storage (CVs, Uploads runtime data)
+/storage/
+/server/storage/
+
+
+

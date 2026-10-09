@@ -7,6 +7,7 @@ import {
   FileQuestion,
   FileText,
   CheckCircle,
+  Send,
 } from 'lucide-react';
 import { StudentNavbar } from '../../components/student/StudentNavbar';
 import { Button } from '../../components/ui/Button';
@@ -17,6 +18,7 @@ import { InternshipSkillComparison } from '../../components/student/internships/
 import { InternshipCompanySection } from '../../components/student/internships/InternshipCompanySection';
 import { internshipDiscoveryService } from '../../services/internshipDiscovery.service';
 import { studentService } from '../../services/student.service';
+import { studentApplicationService } from '../../services/studentApplication.service';
 import { useAuth } from '../../context/AuthContext';
 import { getWorkTypeBadge } from '../../utils/internshipFormatters';
 import type { DiscoveryInternshipItem } from '../../types/internshipDiscovery';
@@ -37,6 +39,7 @@ export const StudentInternshipDetailsPage: React.FC = () => {
   const [studentSkills, setStudentSkills] = useState<StudentSkill[] | null>(null);
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(true);
   const [skillsError, setSkillsError] = useState<string | null>(null);
+  const [hasApplied, setHasApplied] = useState<boolean>(false);
 
   // Validate and determine safe return URL from navigation state
   const rawFrom = (location.state as any)?.from;
@@ -85,11 +88,22 @@ export const StudentInternshipDetailsPage: React.FC = () => {
     setError(null);
 
     try {
-      const res = await internshipDiscoveryService.getPublishedInternshipById(id);
+      const [res, appsRes] = await Promise.all([
+        internshipDiscoveryService.getPublishedInternshipById(id),
+        studentApplicationService.getStudentApplications().catch(() => null),
+      ]);
+
       if (res.status === 'success' && res.internship) {
         setInternship(res.internship);
       } else {
         throw new Error(res.message || 'Internship not found');
+      }
+
+      if (appsRes?.status === 'success' && Array.isArray(appsRes.data)) {
+        const already = appsRes.data.some(
+          (app) => app.internship.id === id || app.internshipId === id
+        );
+        setHasApplied(already);
       }
     } catch (err: any) {
       console.error('Error loading internship details:', err);
@@ -424,21 +438,69 @@ export const StudentInternshipDetailsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Work Type Pill */}
-              <span
-                style={{
-                  padding: '0.35rem 0.85rem',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.825rem',
-                  fontWeight: 700,
-                  backgroundColor: workTypeConfig.bg,
-                  color: workTypeConfig.color,
-                  border: `1px solid ${workTypeConfig.border}`,
-                  letterSpacing: '0.02em',
-                }}
-              >
-                {workTypeConfig.label}
-              </span>
+              {/* Header Actions & Work Type Pill */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '0.825rem',
+                    fontWeight: 700,
+                    backgroundColor: workTypeConfig.bg,
+                    color: workTypeConfig.color,
+                    border: `1px solid ${workTypeConfig.border}`,
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {workTypeConfig.label}
+                </span>
+
+                {hasApplied ? (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    disabled
+                    id="details-already-applied-btn"
+                    style={{
+                      backgroundColor: '#DCFCE7',
+                      color: '#15803D',
+                      borderColor: '#BBF7D0',
+                      cursor: 'default',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    <CheckCircle size={16} />
+                    <span>Applied</span>
+                  </Button>
+                ) : internship.applicationDeadline &&
+                  new Date(internship.applicationDeadline).getTime() < Date.now() ? (
+                  <Button variant="secondary" size="md" disabled style={{ opacity: 0.6 }}>
+                    Applications Closed
+                  </Button>
+                ) : (
+                  <Link
+                    to={`/student/internships/${internship.id}/apply`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Button
+                      id="details-apply-now-btn"
+                      variant="primary"
+                      size="md"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+                      }}
+                    >
+                      <Send size={15} />
+                      <span>Apply Now</span>
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </header>
 
             {/* 1. Quick Overview Grid */}
@@ -538,6 +600,79 @@ export const StudentInternshipDetailsPage: React.FC = () => {
 
             {/* 6. Company Overview & Safe Links Section */}
             <InternshipCompanySection company={internship.company} />
+
+            {/* 7. Bottom Apply Action Card */}
+            <section
+              id="details-bottom-apply-card"
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-xl)',
+                padding: '2rem',
+                marginTop: '1.5rem',
+                boxShadow: 'var(--shadow-sm)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1.5rem',
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: '0 0 0.35rem 0',
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    color: 'var(--color-text-primary)',
+                  }}
+                >
+                  Interested in this opportunity?
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: '0.9rem',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  Submit your verified student profile and attach your CV directly to {companyName}.
+                </p>
+              </div>
+
+              <div>
+                {hasApplied ? (
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    disabled
+                    style={{
+                      backgroundColor: '#DCFCE7',
+                      color: '#15803D',
+                      borderColor: '#BBF7D0',
+                      cursor: 'default',
+                    }}
+                  >
+                    <CheckCircle size={16} /> Application Submitted
+                  </Button>
+                ) : internship.applicationDeadline &&
+                  new Date(internship.applicationDeadline).getTime() < Date.now() ? (
+                  <Button variant="secondary" size="md" disabled style={{ opacity: 0.6 }}>
+                    Applications Closed
+                  </Button>
+                ) : (
+                  <Link
+                    to={`/student/internships/${internship.id}/apply`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Button id="bottom-apply-now-btn" variant="primary" size="lg">
+                      <Send size={16} style={{ marginRight: '0.4rem' }} />
+                      Apply for Internship
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </section>
           </>
         ) : null}
       </main>

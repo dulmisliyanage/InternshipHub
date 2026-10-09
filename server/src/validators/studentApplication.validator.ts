@@ -20,6 +20,23 @@ export const createStudentApplicationSchema = z
 export type CreateStudentApplicationInput = z.infer<typeof createStudentApplicationSchema>;
 
 /**
+ * Zod schema for multipart application submission with CV.
+ */
+export const createStudentApplicationWithCvSchema = z.object({
+  internshipId: z.string().trim().min(1, 'Internship ID is required'),
+  coverLetter: z
+    .string()
+    .trim()
+    .max(5000, 'Cover letter cannot exceed 5000 characters')
+    .optional()
+    .nullable(),
+});
+
+export type CreateStudentApplicationWithCvInput = z.infer<
+  typeof createStudentApplicationWithCvSchema
+>;
+
+/**
  * Zod schema for querying student-owned applications list.
  */
 export const studentApplicationQuerySchema = z.object({

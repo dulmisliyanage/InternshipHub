@@ -1,8 +1,10 @@
 import prisma from '../prisma';
 import {
   CreateStudentApplicationInput,
+  CreateStudentApplicationWithCvInput,
   StudentApplicationQueryInput,
 } from '../validators/studentApplication.validator';
+import { saveCvFile, deleteCvFile } from '../storage/cvStorage';
 
 export class ServiceError extends Error {
   statusCode: number;
@@ -149,6 +151,149 @@ export async function submitApplication(
 }
 
 /**
+ * Submit an application with a validated private PDF CV.
+ * Persists CV privately and handles atomic rollback (orphan file cleanup)
+ * if database transaction or unique constraints fail.
+ */
+export async function submitApplicationWithCv(
+  userId: string,
+  input: CreateStudentApplicationWithCvInput,
+  cvBuffer: Buffer,
+  originalFilename: string
+) {
+  // 1. Resolve student profile from authenticated user session
+  const studentProfile = await prisma.studentProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (!studentProfile) {
+    throw new ServiceError(
+      400,
+      'Student profile not found. Please complete your student profile before applying for internships.'
+    );
+  }
+
+  // 2. Fetch target internship with company summary
+  const internship = await prisma.internship.findUnique({
+    where: { id: input.internshipId },
+    include: {
+      companyProfile: {
+        select: {
+          id: true,
+          companyName: true,
+          logoUrl: true,
+          location: true,
+          industry: true,
+        },
+      },
+    },
+  });
+
+  if (!internship) {
+    throw new ServiceError(404, 'Internship not found');
+  }
+
+  // 3. Verify internship publication eligibility
+  if (internship.status !== 'PUBLISHED') {
+    throw new ServiceError(
+      400,
+      `Cannot apply to an internship that is not published (current status: ${internship.status})`
+    );
+  }
+
+  // 4. Verify application deadline
+  if (internship.applicationDeadline) {
+    const now = new Date();
+    if (now > internship.applicationDeadline) {
+      throw new ServiceError(
+        400,
+        'The application deadline for this internship has passed'
+      );
+    }
+  }
+
+  // 5. Pre-check for duplicate application
+  const existingApplication = await prisma.application.findUnique({
+    where: {
+      studentProfileId_internshipId: {
+        studentProfileId: studentProfile.id,
+        internshipId: internship.id,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingApplication) {
+    throw new ServiceError(
+      409,
+      'You have already submitted an application for this internship'
+    );
+  }
+
+  // 6. Save CV file to secure private storage
+  const { storageKey } = await saveCvFile(cvBuffer, originalFilename);
+
+  // 7. Execute atomic creation with cleanup fallback
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const application = await tx.application.create({
+        data: {
+          studentProfileId: studentProfile.id,
+          internshipId: internship.id,
+          coverLetter: input.coverLetter || null,
+          cvUrl: storageKey,
+          status: 'APPLIED',
+        },
+      });
+
+      await tx.applicationStatusHistory.create({
+        data: {
+          applicationId: application.id,
+          fromStatus: null,
+          toStatus: 'APPLIED',
+          changedById: userId,
+          note: 'Initial application submitted with CV',
+        },
+      });
+
+      return application;
+    });
+
+    return {
+      id: result.id,
+      status: result.status,
+      appliedAt: result.appliedAt,
+      updatedAt: result.updatedAt,
+      coverLetter: result.coverLetter,
+      hasCv: true,
+      internshipId: internship.id,
+      internship: {
+        id: internship.id,
+        title: internship.title,
+        workType: internship.workType,
+        location: internship.location,
+        category: internship.category,
+        duration: internship.duration,
+        applicationDeadline: internship.applicationDeadline,
+        company: internship.companyProfile,
+      },
+    };
+  } catch (error: any) {
+    // Clean up stored file to prevent orphaned files in private storage
+    await deleteCvFile(storageKey);
+
+    if (error.code === 'P2002') {
+      throw new ServiceError(
+        409,
+        'You have already submitted an application for this internship'
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * List applications submitted by the authenticated student.
  */
 export async function listStudentApplications(
@@ -225,7 +370,7 @@ export async function listStudentApplications(
     appliedAt: app.appliedAt,
     updatedAt: app.updatedAt,
     coverLetter: app.coverLetter,
-    cvUrl: app.cvUrl,
+    hasCv: !!app.cvUrl,
     internship: {
       id: app.internship.id,
       title: app.internship.title,
@@ -327,7 +472,7 @@ export async function getStudentApplicationById(
     id: application.id,
     status: application.status,
     coverLetter: application.coverLetter,
-    cvUrl: application.cvUrl,
+    hasCv: !!application.cvUrl,
     appliedAt: application.appliedAt,
     updatedAt: application.updatedAt,
     internship: {

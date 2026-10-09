@@ -12,6 +12,7 @@ import { ChooseAccountTypePage } from './pages/auth/ChooseAccountTypePage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { StudentInternshipsPage } from './pages/student/StudentInternshipsPage';
 import { StudentInternshipDetailsPage } from './pages/student/StudentInternshipDetailsPage';
+import { StudentApplyPage } from './pages/student/StudentApplyPage';
 import { StudentOnboardingPage } from './pages/student/StudentOnboardingPage';
 import { StudentProfilePage } from './pages/student/StudentProfilePage';
 import { StudentProfileEditPage } from './pages/student/StudentProfileEditPage';
@@ -41,6 +42,7 @@ export const App: React.FC = () => {
             <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/internships" element={<StudentInternshipsPage />} />
             <Route path="/student/internships/:id" element={<StudentInternshipDetailsPage />} />
+            <Route path="/student/internships/:id/apply" element={<StudentApplyPage />} />
             <Route path="/student/onboarding" element={<StudentOnboardingPage />} />
             <Route path="/student/profile" element={<StudentProfilePage />} />
             <Route path="/student/profile/edit" element={<StudentProfileEditPage />} />

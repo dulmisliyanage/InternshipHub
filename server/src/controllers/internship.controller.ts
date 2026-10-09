@@ -152,35 +152,33 @@ export async function createInternship(
   }
 
   try {
-    const created = await prisma.$transaction(async (tx) => {
-      return await tx.internship.create({
-        data: {
-          companyProfileId: companyProfile.id,
-          title: data.title,
-          category: data.category ?? null,
-          description: data.description,
-          responsibilities: data.responsibilities ?? null,
-          location: data.location ?? null,
-          workType: data.workType,
-          duration: data.duration ?? null,
-          allowanceMin: data.allowanceMin ?? null,
-          allowanceMax: data.allowanceMax ?? null,
-          currency: data.currency ?? 'LKR',
-          positions: data.positions ?? 1,
-          applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
-          status: 'DRAFT',
-          skills:
-            data.skills && data.skills.length > 0
-              ? {
-                  create: data.skills.map((s) => ({
-                    skillId: s.skillId,
-                    type: s.type,
-                  })),
-                }
-              : undefined,
-        },
-        include: internshipInclude,
-      });
+    const created = await prisma.internship.create({
+      data: {
+        companyProfileId: companyProfile.id,
+        title: data.title,
+        category: data.category ?? null,
+        description: data.description,
+        responsibilities: data.responsibilities ?? null,
+        location: data.location ?? null,
+        workType: data.workType,
+        duration: data.duration ?? null,
+        allowanceMin: data.allowanceMin ?? null,
+        allowanceMax: data.allowanceMax ?? null,
+        currency: data.currency ?? 'LKR',
+        positions: data.positions ?? 1,
+        applicationDeadline: data.applicationDeadline ? new Date(data.applicationDeadline) : null,
+        status: 'DRAFT',
+        skills:
+          data.skills && data.skills.length > 0
+            ? {
+                create: data.skills.map((s) => ({
+                  skillId: s.skillId,
+                  type: s.type,
+                })),
+              }
+            : undefined,
+      },
+      include: internshipInclude,
     });
 
     res.status(201).json({

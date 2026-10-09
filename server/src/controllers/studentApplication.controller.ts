@@ -2,11 +2,13 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import {
   createStudentApplicationSchema,
+  createStudentApplicationWithCvSchema,
   studentApplicationQuerySchema,
   applicationIdParamSchema,
 } from '../validators/studentApplication.validator';
 import {
   submitApplication,
+  submitApplicationWithCv,
   listStudentApplications,
   getStudentApplicationById as getApplicationDetails,
   withdrawApplication,
@@ -59,6 +61,72 @@ export async function applyForInternship(
     }
 
     console.error('Error applying for internship:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to submit application. Please try again later.',
+    });
+  }
+}
+
+/**
+ * POST /api/student/applications/with-cv
+ * Submit a new application with a private PDF CV (multipart/form-data).
+ */
+export async function applyForInternshipWithCv(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ status: 'error', message: 'Authentication required' });
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({
+      status: 'error',
+      message: 'A CV document in PDF format is required.',
+    });
+    return;
+  }
+
+  const parseResult = createStudentApplicationWithCvSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    const errorDetails = parseResult.error.issues.map((err) => ({
+      field: err.path.join('.'),
+      message: err.message,
+    }));
+    res.status(400).json({
+      status: 'error',
+      message: errorDetails[0]?.message || 'Validation failed',
+      errors: errorDetails,
+    });
+    return;
+  }
+
+  try {
+    const application = await submitApplicationWithCv(
+      userId,
+      parseResult.data,
+      req.file.buffer,
+      req.file.originalname
+    );
+    res.status(201).json({
+      status: 'success',
+      message: 'Application submitted successfully with CV',
+      data: application,
+    });
+  } catch (err: any) {
+    if (err instanceof ServiceError) {
+      res.status(err.statusCode).json({
+        status: 'error',
+        message: err.message,
+        ...(err.errors ? { errors: err.errors } : {}),
+      });
+      return;
+    }
+
+    console.error('Error applying for internship with CV:', err);
     res.status(500).json({
       status: 'error',
       message: 'Failed to submit application. Please try again later.',
