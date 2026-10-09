@@ -12,6 +12,7 @@ import {
   getPublishedInternships,
   getPublishedInternshipById,
 } from '../controllers/studentInternship.controller';
+import studentApplicationRoutes from './studentApplication.routes';
 
 const router = Router();
 
@@ -30,6 +31,9 @@ router.delete('/profile/image', deleteProfileImage);
 // Internship Discovery (Step 5.1) - Read-only published internship discovery
 router.get('/internships', getPublishedInternships);
 router.get('/internships/:id', getPublishedInternshipById);
+
+// Internship Applications (Step 6.2)
+router.use('/applications', studentApplicationRoutes);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
