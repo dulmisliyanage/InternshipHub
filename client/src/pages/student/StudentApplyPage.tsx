@@ -261,6 +261,14 @@ export const StudentApplyPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="md"
+                onClick={() => navigate('/student/applications')}
+                id="view-in-my-applications-btn"
+              >
+                Track in My Applications
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
                 onClick={() => navigate('/student/internships')}
               >
                 Browse More Internships
@@ -343,6 +351,13 @@ export const StudentApplyPage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <Button
                 variant="primary"
+                onClick={() => navigate('/student/applications')}
+                id="already-applied-track-btn"
+              >
+                Track in My Applications
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => navigate('/student/internships')}
               >
                 Browse Other Internships

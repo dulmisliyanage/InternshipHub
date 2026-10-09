@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, User as UserIcon, LogOut, Briefcase } from 'lucide-react';
+import { LayoutDashboard, User as UserIcon, LogOut, Briefcase, FileText } from 'lucide-react';
 import { Button } from '../ui';
 import { ProfileAvatar } from './profile/ProfileAvatar';
 import { useAuth } from '../../context/AuthContext';
@@ -36,6 +36,7 @@ export const StudentNavbar: React.FC<StudentNavbarProps> = ({
 
   const isDashboard = location.pathname === '/student/dashboard';
   const isInternships = location.pathname.startsWith('/student/internships');
+  const isApplications = location.pathname.startsWith('/student/applications');
   const isProfile = location.pathname.startsWith('/student/profile');
 
   return (
@@ -111,6 +112,27 @@ export const StudentNavbar: React.FC<StudentNavbarProps> = ({
           >
             <Briefcase size={16} />
             <span>Discover Internships</span>
+          </Link>
+
+          <Link
+            to="/student/applications"
+            id="nav-student-applications"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              textDecoration: 'none',
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-lg)',
+              fontSize: '0.875rem',
+              fontWeight: isApplications ? 700 : 500,
+              color: isApplications ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              backgroundColor: isApplications ? 'var(--color-primary-light)' : 'transparent',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <FileText size={16} />
+            <span>My Applications</span>
           </Link>
 
           <Link
