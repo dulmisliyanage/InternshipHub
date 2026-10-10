@@ -16,6 +16,11 @@ import {
   closeCompanyInternship,
   archiveCompanyInternship,
 } from '../controllers/internship.controller';
+import {
+  getInternshipApplications,
+  getApplicationById,
+  downloadApplicationCv,
+} from '../controllers/companyApplicant.controller';
 import { getSkillsCatalog } from '../controllers/student-profile.controller';
 
 const router = Router();
@@ -42,6 +47,11 @@ router.put('/internships/:id', updateCompanyInternship);
 router.post('/internships/:id/publish', publishCompanyInternship);
 router.post('/internships/:id/close', closeCompanyInternship);
 router.post('/internships/:id/archive', archiveCompanyInternship);
+
+// Applicant Management (Phase 6, Step 6.5)
+router.get('/internships/:id/applications', getInternshipApplications);
+router.get('/applications/:id', getApplicationById);
+router.get('/applications/:id/cv', downloadApplicationCv);
 
 router.get('/dashboard', (req: AuthenticatedRequest, res: Response) => {
   res.status(200).json({
