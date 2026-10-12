@@ -1,5 +1,9 @@
+import { ApplicationStatus } from '@prisma/client';
 import prisma from '../prisma';
-import { CompanyApplicantQueryInput } from '../validators/companyApplicant.validator';
+import {
+  CompanyApplicantQueryInput,
+  UpdateApplicationStatusInput,
+} from '../validators/companyApplicant.validator';
 import { getCvFilePath } from '../storage/cvStorage';
 
 export class ServiceError extends Error {
@@ -344,4 +348,174 @@ export async function getCompanyApplicationCvPath(
     filePath,
     filename: 'applicant_cv.pdf',
   };
+}
+
+/**
+ * Validated status transition rules for company recruiters.
+ * - APPLIED -> UNDER_REVIEW or REJECTED
+ * - UNDER_REVIEW -> SHORTLISTED or REJECTED
+ * - SHORTLISTED -> INTERVIEW or REJECTED
+ * - INTERVIEW -> ACCEPTED or REJECTED
+ * - ACCEPTED, REJECTED, WITHDRAWN -> terminal (no transitions allowed)
+ */
+export const ALLOWED_COMPANY_TRANSITIONS: Record<
+  ApplicationStatus,
+  ApplicationStatus[]
+> = {
+  APPLIED: ['UNDER_REVIEW', 'REJECTED'],
+  UNDER_REVIEW: ['SHORTLISTED', 'REJECTED'],
+  SHORTLISTED: ['INTERVIEW', 'REJECTED'],
+  INTERVIEW: ['ACCEPTED', 'REJECTED'],
+  ACCEPTED: [],
+  REJECTED: [],
+  WITHDRAWN: [],
+};
+
+/**
+ * Updates application recruitment status with strict transition rules,
+ * atomic Prisma transaction, optimistic concurrency control, and audit history logging.
+ *
+ * Requirements enforced:
+ * 1. Company authentication & ownership (returns 404 for non-existent or cross-company applications).
+ * 2. Rejection of same-status transitions.
+ * 3. Rejection of terminal status mutations (ACCEPTED, REJECTED, WITHDRAWN).
+ * 4. Company cannot set WITHDRAWN (student-only workflow).
+ * 5. Rejection of invalid or skipped stages.
+ * 6. Atomic transaction updating Application and creating ApplicationStatusHistory.
+ * 7. Optimistic concurrency guard returning 409 Conflict if modified in the interim.
+ * 8. Safe response projections (no passwords or leaked storage paths).
+ */
+export async function updateCompanyApplicationStatus(
+  userId: string,
+  applicationId: string,
+  input: UpdateApplicationStatusInput
+) {
+  const companyProfile = await getCompanyProfileByUserId(userId);
+
+  // 1. Resolve application and verify company ownership
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: {
+      id: true,
+      status: true,
+      internship: {
+        select: {
+          id: true,
+          companyProfileId: true,
+        },
+      },
+    },
+  });
+
+  if (!application || application.internship.companyProfileId !== companyProfile.id) {
+    throw new ServiceError(404, 'Application not found');
+  }
+
+  const currentStatus = application.status;
+  const targetStatus = input.status;
+
+  // 2. Reject company attempt to set WITHDRAWN
+  if (targetStatus === 'WITHDRAWN') {
+    throw new ServiceError(
+      400,
+      'Companies cannot set application status to WITHDRAWN'
+    );
+  }
+
+  // 3. Reject same-status updates
+  if (currentStatus === targetStatus) {
+    throw new ServiceError(
+      400,
+      `Application is already in '${currentStatus}' status`
+    );
+  }
+
+  // 4. Reject updates from terminal statuses
+  if (['ACCEPTED', 'REJECTED', 'WITHDRAWN'].includes(currentStatus)) {
+    throw new ServiceError(
+      400,
+      `Cannot change status of an application that is already '${currentStatus}'`
+    );
+  }
+
+  // 5. Enforce allowed forward transitions
+  const allowedNext = ALLOWED_COMPANY_TRANSITIONS[currentStatus] || [];
+  if (!allowedNext.includes(targetStatus)) {
+    throw new ServiceError(
+      400,
+      `Invalid status transition from '${currentStatus}' to '${targetStatus}'. Allowed transitions: ${
+        allowedNext.join(', ') || 'none'
+      }`
+    );
+  }
+
+  // 6. Execute atomic status transition with optimistic concurrency lock
+  return await prisma.$transaction(async (tx) => {
+    // Conditional update: only update if current status has not changed
+    const updateResult = await tx.application.updateMany({
+      where: {
+        id: applicationId,
+        status: currentStatus,
+        internship: {
+          companyProfileId: companyProfile.id,
+        },
+      },
+      data: {
+        status: targetStatus,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      // Concurrency conflict: application status was changed concurrently
+      const current = await tx.application.findUnique({
+        where: { id: applicationId },
+        select: { status: true },
+      });
+      throw new ServiceError(
+        409,
+        `Application status changed concurrently to '${
+          current?.status || 'UNKNOWN'
+        }'. Transition to '${targetStatus}' could not be completed.`
+      );
+    }
+
+    // 7. Record immutable audit history entry
+    const historyEntry = await tx.applicationStatusHistory.create({
+      data: {
+        applicationId,
+        fromStatus: currentStatus,
+        toStatus: targetStatus,
+        changedById: userId,
+        note: input.note ? input.note.trim() : null,
+      },
+      select: {
+        id: true,
+        fromStatus: true,
+        toStatus: true,
+        note: true,
+        changedAt: true,
+        changedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    const updatedApplication = await tx.application.findUnique({
+      where: { id: applicationId },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      application: updatedApplication,
+      historyEntry,
+    };
+  });
 }

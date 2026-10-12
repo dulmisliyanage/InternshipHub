@@ -5,11 +5,13 @@ import {
   companyApplicantQuerySchema,
   internshipIdParamSchema,
   applicationIdParamSchema,
+  updateApplicationStatusSchema,
 } from '../validators/companyApplicant.validator';
 import {
   getCompanyInternshipApplications,
   getCompanyApplicationDetails,
   getCompanyApplicationCvPath,
+  updateCompanyApplicationStatus,
   ServiceError,
 } from '../services/companyApplicant.service';
 
@@ -194,6 +196,79 @@ export async function downloadApplicationCv(
     res.status(500).json({
       status: 'error',
       message: 'Failed to download CV.',
+    });
+  }
+}
+
+/**
+ * PATCH /api/company/applications/:id/status
+ * Update an applicant's recruitment status with transition enforcement,
+ * atomic history recording, and optimistic concurrency check.
+ */
+export async function updateApplicationStatus(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ status: 'error', message: 'Authentication required' });
+    return;
+  }
+
+  const paramParseResult = applicationIdParamSchema.safeParse(req.params);
+  if (!paramParseResult.success) {
+    res.status(400).json({
+      status: 'error',
+      message: 'Invalid application ID format',
+    });
+    return;
+  }
+
+  const bodyParseResult = updateApplicationStatusSchema.safeParse(req.body);
+  if (!bodyParseResult.success) {
+    const errorDetails = bodyParseResult.error.issues.map((err) => ({
+      field: err.path.join('.'),
+      message: err.message,
+    }));
+    res.status(400).json({
+      status: 'error',
+      message: errorDetails[0]?.message || 'Invalid status update payload',
+      errors: errorDetails,
+    });
+    return;
+  }
+
+  try {
+    const result = await updateCompanyApplicationStatus(
+      userId,
+      paramParseResult.data.id,
+      bodyParseResult.data
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: `Application status updated to ${result.application?.status}`,
+      data: {
+        id: result.application?.id,
+        status: result.application?.status,
+        updatedAt: result.application?.updatedAt,
+        history: result.historyEntry,
+      },
+    });
+  } catch (err: any) {
+    if (err instanceof ServiceError) {
+      res.status(err.statusCode).json({
+        status: 'error',
+        message: err.message,
+        ...(err.errors ? { errors: err.errors } : {}),
+      });
+      return;
+    }
+
+    console.error('Error updating application status:', err);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update application status.',
     });
   }
 }

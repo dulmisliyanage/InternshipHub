@@ -1,6 +1,8 @@
 import type {
   CompanyApplicantListResponse,
   CompanyApplicantDetailResponse,
+  UpdateApplicationStatusPayload,
+  UpdateApplicationStatusResponse,
 } from '../types/companyApplicant';
 import type { ApplicationStatus } from '../types/application';
 import { ApiError } from './auth.service';
@@ -90,5 +92,32 @@ export const companyApplicantService = {
     }
 
     return await res.blob();
+  },
+
+  /**
+   * Update applicant recruitment status (e.g. UNDER_REVIEW, SHORTLISTED, INTERVIEW, ACCEPTED, REJECTED).
+   */
+  async updateApplicationStatus(
+    applicationId: string,
+    payload: UpdateApplicationStatusPayload
+  ): Promise<UpdateApplicationStatusResponse> {
+    const res = await fetch(`${API_BASE}/applications/${applicationId}/status`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new ApiError(
+        data.message || `Failed to update application status (${res.status})`,
+        res.status,
+        data.errors
+      );
+    }
+
+    return data as UpdateApplicationStatusResponse;
   },
 };

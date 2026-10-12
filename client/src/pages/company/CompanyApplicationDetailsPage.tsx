@@ -18,6 +18,7 @@ import {
 import { CompanyNavbar } from '../../components/company/CompanyNavbar';
 import { ApplicationStatusBadge } from '../../components/student/applications/ApplicationStatusBadge';
 import { CompanyStatusTimeline } from '../../components/company/applicants/CompanyStatusTimeline';
+import { ApplicationStatusWorkflowCard } from '../../components/company/applicants/ApplicationStatusWorkflowCard';
 import { Button } from '../../components/ui';
 import { companyApplicantService } from '../../services/companyApplicant.service';
 import { companyService } from '../../services/company.service';
@@ -745,8 +746,18 @@ export const CompanyApplicationDetailsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Column: CV Attachment, Timeline, Internship Summary */}
+              {/* Right Column: Status Workflow, CV Attachment, Timeline, Internship Summary */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+                {/* Recruitment Status Workflow & Decisions */}
+                <ApplicationStatusWorkflowCard
+                  currentStatus={application.status}
+                  applicationId={application.id}
+                  candidateName={application.student.name}
+                  internshipTitle={application.internship.title}
+                  onStatusUpdated={fetchDetails}
+                  onConflictReload={fetchDetails}
+                />
+
                 {/* CV Attachment Card */}
                 <div
                   style={{

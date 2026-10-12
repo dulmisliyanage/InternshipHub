@@ -88,3 +88,19 @@ export interface CompanyApplicantDetailResponse {
   status: 'success';
   data: CompanyApplicantDetail;
 }
+
+export interface UpdateApplicationStatusPayload {
+  status: ApplicationStatus;
+  note?: string | null;
+}
+
+export interface UpdateApplicationStatusResponse {
+  status: 'success';
+  message: string;
+  data: {
+    id: string;
+    status: ApplicationStatus;
+    updatedAt: string;
+    history: CompanyStatusHistoryItem;
+  };
+}

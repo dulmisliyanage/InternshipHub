@@ -74,3 +74,37 @@ export const applicationIdParamSchema = z.object({
 });
 
 export type ApplicationIdParam = z.infer<typeof applicationIdParamSchema>;
+
+/**
+ * Zod schema for updating an application's recruitment status.
+ * Enforces strict schema to prevent unrecognized payload properties.
+ */
+export const updateApplicationStatusSchema = z
+  .object({
+    status: z.enum(
+      [
+        'APPLIED',
+        'UNDER_REVIEW',
+        'SHORTLISTED',
+        'INTERVIEW',
+        'ACCEPTED',
+        'REJECTED',
+        'WITHDRAWN',
+      ],
+      {
+        message:
+          'Status must be APPLIED, UNDER_REVIEW, SHORTLISTED, INTERVIEW, ACCEPTED, REJECTED, or WITHDRAWN',
+      }
+    ),
+    note: z
+      .string()
+      .trim()
+      .max(1000, 'Review note must not exceed 1000 characters')
+      .optional()
+      .nullable(),
+  })
+  .strict();
+
+export type UpdateApplicationStatusInput = z.infer<
+  typeof updateApplicationStatusSchema
+>;
