@@ -23,6 +23,8 @@ import { CompanyInternshipsPage } from './pages/company/CompanyInternshipsPage';
 import { CompanyInternshipCreatePage } from './pages/company/CompanyInternshipCreatePage';
 import { CompanyInternshipDetailsPage } from './pages/company/CompanyInternshipDetailsPage';
 import { CompanyInternshipEditPage } from './pages/company/CompanyInternshipEditPage';
+import { CompanyApplicantsPage } from './pages/company/CompanyApplicantsPage';
+import { CompanyApplicationDetailsPage } from './pages/company/CompanyApplicationDetailsPage';
 import { CompanyOnboardingPage } from './pages/company/CompanyOnboardingPage';
 import { CompanyProfilePage } from './pages/company/CompanyProfilePage';
 import { CompanyProfileEditPage } from './pages/company/CompanyProfileEditPage';
@@ -58,6 +60,8 @@ export const App: React.FC = () => {
             <Route path="/company/internships/new" element={<CompanyInternshipCreatePage />} />
             <Route path="/company/internships/:id" element={<CompanyInternshipDetailsPage />} />
             <Route path="/company/internships/:id/edit" element={<CompanyInternshipEditPage />} />
+            <Route path="/company/internships/:id/applications" element={<CompanyApplicantsPage />} />
+            <Route path="/company/applications/:id" element={<CompanyApplicationDetailsPage />} />
             <Route path="/company/onboarding" element={<CompanyOnboardingPage />} />
             <Route path="/company/profile" element={<CompanyProfilePage />} />
             <Route path="/company/profile/edit" element={<CompanyProfileEditPage />} />

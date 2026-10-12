@@ -354,32 +354,63 @@ export const CompanyInternshipCard: React.FC<CompanyInternshipCardProps> = ({ in
           )}
         </div>
 
-        {/* View Details Link */}
-        <Link
-          to={`/company/internships/${internship.id}`}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            color: 'var(--color-primary)',
-            textDecoration: 'none',
-            padding: '0.35rem 0.75rem',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--color-primary-light)',
-            transition: 'background-color 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#E0E7FF';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--color-primary-light)';
-          }}
-        >
-          <span>View</span>
-          <ArrowRight size={14} />
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* View Applicants Link */}
+          <Link
+            to={`/company/internships/${internship.id}/applications`}
+            id={`view-applicants-${internship.id}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              color: 'var(--color-primary)',
+              textDecoration: 'none',
+              padding: '0.35rem 0.75rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid #BFDBFE',
+              backgroundColor: '#EFF6FF',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#DBEAFE';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#EFF6FF';
+            }}
+          >
+            <Users size={14} />
+            <span>Applicants</span>
+          </Link>
+
+          {/* View Details Link */}
+          <Link
+            to={`/company/internships/${internship.id}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: 'var(--color-primary)',
+              textDecoration: 'none',
+              padding: '0.35rem 0.75rem',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-primary-light)',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#E0E7FF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-light)';
+            }}
+          >
+            <span>View</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
       </div>
     </div>
   );

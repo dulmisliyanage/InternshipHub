@@ -607,6 +607,18 @@ export const CompanyInternshipDetailsPage: React.FC = () => {
 
             {/* Lifecycle & Edit Action Buttons Container */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              {/* View Applicants button */}
+              <Link to={`/company/internships/${internship.id}/applications`} style={{ textDecoration: 'none' }}>
+                <Button
+                  id="view-applicants-btn"
+                  variant="primary"
+                  size="md"
+                  leftIcon={<Users size={15} />}
+                >
+                  View Applicants
+                </Button>
+              </Link>
+
               {/* Edit button available for DRAFT, PUBLISHED, and CLOSED */}
               {internship.status !== 'ARCHIVED' && (
                 <Link to={`/company/internships/${internship.id}/edit`} style={{ textDecoration: 'none' }}>
